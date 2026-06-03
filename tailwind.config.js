@@ -11,12 +11,12 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Calm, warm light-theme palette
-        cream: "#faf8f5",
+        // Light theme: pure-white page, cards lifted by hairline borders + soft shadow
+        cream: "#ffffff",
         surface: "#ffffff",
         ink: "#2f2a28",
         muted: "#7a716b",
-        line: "#ece6df",
+        line: "#eceaf0",
         accent: {
           DEFAULT: "#7c6aa8", // calm violet — distinct from red/amber/green statuses
           soft: "#efeaf6",
@@ -35,8 +35,8 @@ export default {
         xl2: "1.25rem",
       },
       boxShadow: {
-        card: "0 1px 2px rgba(47,42,40,0.04), 0 4px 16px rgba(47,42,40,0.05)",
-        lift: "0 8px 30px rgba(47,42,40,0.12)",
+        card: "0 1px 2px rgba(47,42,40,0.05), 0 6px 18px rgba(47,42,40,0.07)",
+        lift: "0 10px 34px rgba(47,42,40,0.14)",
       },
       fontFamily: {
         sans: [
