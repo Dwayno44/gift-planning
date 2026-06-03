@@ -33,6 +33,33 @@ export function normalizeData(input: unknown): AppData {
     people,
     themes: Array.isArray(data.themes) ? data.themes : [],
     updatedAt: data.updatedAt ?? new Date().toISOString(),
+    appliedSeedIds: Array.isArray(data.appliedSeedIds) ? data.appliedSeedIds : undefined,
+  };
+}
+
+/**
+ * Additively merge brand-new seed entries into already-saved data. Existing
+ * people are never touched (edits and gift ideas are preserved); a seed person
+ * is only added if it has never been applied to this device AND isn't already
+ * present. Seed ids the user later deletes stay deleted, because their id
+ * remains recorded in appliedSeedIds.
+ */
+export function mergeSeedAdditions(data: AppData): AppData {
+  const seed = sampleData();
+  const applied = new Set(data.appliedSeedIds ?? []);
+  const presentIds = new Set(data.people.map((p) => p.id));
+
+  const newPeople = seed.people.filter((sp) => !presentIds.has(sp.id) && !applied.has(sp.id));
+  const newThemes = seed.themes.filter((t) => !data.themes.includes(t));
+
+  // Record every current seed id as applied so future loads don't re-add them.
+  const appliedSeedIds = Array.from(new Set([...applied, ...seed.people.map((p) => p.id)]));
+
+  return {
+    ...data,
+    people: newPeople.length ? [...data.people, ...newPeople] : data.people,
+    themes: newThemes.length ? [...data.themes, ...newThemes] : data.themes,
+    appliedSeedIds,
   };
 }
 
@@ -45,7 +72,11 @@ export function load(): AppData {
       save(seeded);
       return seeded;
     }
-    return normalizeData(JSON.parse(raw));
+    // Existing device: keep everything the user has, but pull in any people
+    // newly added to the seed since they last opened the app.
+    const merged = mergeSeedAdditions(normalizeData(JSON.parse(raw)));
+    save(merged);
+    return merged;
   } catch (err) {
     console.warn("Failed to load saved data, starting fresh.", err);
     return sampleData();

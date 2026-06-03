@@ -65,4 +65,11 @@ export interface AppData {
   people: Person[];
   themes: string[];
   updatedAt: string;
+  /**
+   * Seed person ids that have already been applied to this device. Lets the
+   * app pull in NEW people added to the seed (so a device already in use picks
+   * them up on next load) while never resurrecting a seed person the user has
+   * intentionally deleted.
+   */
+  appliedSeedIds?: string[];
 }

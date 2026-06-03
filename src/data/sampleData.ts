@@ -41,5 +41,6 @@ export function sampleData(): AppData {
     people: people.map((p) => ({ ...p, giftIdeas: p.giftIdeas.map((g) => ({ ...g })) })),
     themes: [...DEFAULT_THEMES],
     updatedAt: new Date().toISOString(),
+    appliedSeedIds: people.map((p) => p.id),
   };
 }
