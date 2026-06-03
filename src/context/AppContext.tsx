@@ -1,23 +1,44 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import {
+  onAuthStateChanged,
+  isSignInWithEmailLink,
+  signInWithEmailLink,
+  signOut as fbSignOut,
+  type User,
+} from "firebase/auth";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import type { AppData, GiftIdea, Person } from "../types";
 import * as storage from "../data/storage";
+import { sampleData } from "../data/sampleData";
 import { makeId } from "../utils/id";
+import { getFirebase, isEmailAllowed, isFirebaseConfigured, HOUSEHOLD_ID } from "../lib/firebase";
+import Login, { EMAIL_KEY } from "../components/Login";
 
 // ---------------------------------------------------------------------------
-// AppContext is the app's data layer seam. Components never import storage
-// directly — they call these methods. This keeps people OUT of the UI
-// components (no hardcoded data) and makes a future cloud backend a localised
-// change inside this provider + storage.ts.
+// AppContext is the app's single data-layer seam. Components never touch
+// storage directly — they go through here.
+//
+// Two persistence modes, chosen once at startup:
+//   • local — Firebase not configured → per-device LocalStorage (original behaviour).
+//   • cloud — Firebase configured → email-link auth + a shared Firestore document
+//             that syncs live across every signed-in device.
+// The component-facing API is identical in both modes.
 // ---------------------------------------------------------------------------
+
+interface Session {
+  mode: "local" | "cloud";
+  email: string | null;
+  signOut: () => void;
+}
 
 interface AppContextValue {
-  people: Person[]; // active (non-archived) people
+  people: Person[];
   archived: Person[];
   themes: string[];
   updatedAt: string;
+  session: Session;
 
-  // People
   addPerson: (data: Omit<Person, "id" | "giftIdeas">) => Person;
   updatePerson: (id: string, patch: Partial<Person>) => void;
   archivePerson: (id: string) => void;
@@ -25,16 +46,13 @@ interface AppContextValue {
   deletePerson: (id: string) => void;
   getPerson: (id: string) => Person | undefined;
 
-  // Gift ideas
   addGiftIdea: (personId: string, idea: Omit<GiftIdea, "id" | "dateAdded">) => void;
   updateGiftIdea: (personId: string, ideaId: string, patch: Partial<GiftIdea>) => void;
   deleteGiftIdea: (personId: string, ideaId: string) => void;
 
-  // Themes
   addTheme: (theme: string) => void;
   removeTheme: (theme: string) => void;
 
-  // Data management
   exportData: () => string;
   importData: (json: string) => void;
   resetToSample: () => void;
@@ -43,14 +61,128 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-export function AppProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<AppData>(() => storage.load());
+const MODE: "local" | "cloud" = isFirebaseConfigured() ? "cloud" : "local";
+const HOUSEHOLD_PATH = ["households", HOUSEHOLD_ID] as const;
 
-  // Persist on every change. (A debounce could be added for a cloud backend.)
+/** Content fingerprint that ignores volatile fields (updatedAt/version), used
+ *  to skip echo-writes when a change actually came from a remote snapshot. */
+function fingerprint(d: AppData): string {
+  return JSON.stringify({ people: d.people, themes: d.themes, appliedSeedIds: d.appliedSeedIds ?? [] });
+}
+
+function Splash() {
+  return (
+    <div className="min-h-screen bg-cream flex items-center justify-center">
+      <div className="text-center text-muted">
+        <p className="text-3xl">🎁</p>
+        <p className="mt-2 text-sm">Loading…</p>
+      </div>
+    </div>
+  );
+}
+
+export function AppProvider({ children }: { children: ReactNode }) {
+  const [data, setData] = useState<AppData>(() =>
+    MODE === "local" ? storage.load() : storage.emptyData()
+  );
+
+  // Cloud-only auth/loading state. In local mode these start "ready".
+  const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(MODE === "local");
+  const [cloudLoaded, setCloudLoaded] = useState(MODE === "local");
+  const lastSyncedRef = useRef<string | null>(null);
+
+  // --- Local persistence -----------------------------------------------------
   useEffect(() => {
+    if (MODE !== "local") return;
     storage.save(data);
   }, [data]);
 
+  // --- Cloud: authentication -------------------------------------------------
+  useEffect(() => {
+    if (MODE !== "cloud") return;
+    const { auth } = getFirebase();
+
+    // Finish a magic-link sign-in if we arrived via the email link.
+    (async () => {
+      try {
+        if (isSignInWithEmailLink(auth, window.location.href)) {
+          let email = window.localStorage.getItem(EMAIL_KEY);
+          if (!email) email = window.prompt("Confirm your email to finish signing in") || "";
+          if (email) {
+            await signInWithEmailLink(auth, email, window.location.href);
+            window.localStorage.removeItem(EMAIL_KEY);
+          }
+          window.history.replaceState({}, "", window.location.origin + import.meta.env.BASE_URL);
+        }
+      } catch (err) {
+        console.error("Email-link sign-in failed", err);
+      }
+    })();
+
+    return onAuthStateChanged(auth, (u) => {
+      if (u && !isEmailAllowed(u.email)) {
+        // Authenticated but not on the household allow-list — reject.
+        fbSignOut(auth);
+        setUser(null);
+      } else {
+        setUser(u);
+      }
+      setAuthReady(true);
+    });
+  }, []);
+
+  // --- Cloud: live subscription to the shared household document -------------
+  useEffect(() => {
+    if (MODE !== "cloud" || !user) return;
+    const { db } = getFirebase();
+    const ref = doc(db, ...HOUSEHOLD_PATH);
+
+    return onSnapshot(
+      ref,
+      async (snap) => {
+        if (!snap.exists()) {
+          // First ever sign-in: seed the shared document.
+          const seeded = sampleData();
+          lastSyncedRef.current = fingerprint(seeded);
+          await setDoc(ref, seeded);
+          setData(seeded);
+          setCloudLoaded(true);
+          return;
+        }
+        const remote = storage.normalizeData(snap.data());
+        const merged = storage.mergeSeedAdditions(remote);
+        if (fingerprint(merged) !== fingerprint(remote)) {
+          // New seed people were added since last time — persist the merge.
+          lastSyncedRef.current = fingerprint(merged);
+          await setDoc(ref, merged);
+        } else {
+          lastSyncedRef.current = fingerprint(remote);
+        }
+        setData(merged);
+        setCloudLoaded(true);
+      },
+      (err) => console.error("Firestore subscription error", err)
+    );
+  }, [user]);
+
+  // --- Cloud: debounced write on local changes (skips remote echoes) ---------
+  useEffect(() => {
+    if (MODE !== "cloud" || !user || !cloudLoaded) return;
+    const fp = fingerprint(data);
+    if (fp === lastSyncedRef.current) return;
+    const { db } = getFirebase();
+    const ref = doc(db, ...HOUSEHOLD_PATH);
+    const t = setTimeout(() => {
+      lastSyncedRef.current = fp;
+      setDoc(ref, { ...data, updatedAt: new Date().toISOString() }).catch((e) =>
+        console.error("Cloud save failed", e)
+      );
+    }, 600);
+    return () => clearTimeout(t);
+  }, [data, user, cloudLoaded]);
+
+  // --- Mutations (identical in both modes) -----------------------------------
   const update = useCallback((mutate: (draft: AppData) => AppData) => {
     setData((prev) => mutate(prev));
   }, []);
@@ -66,42 +198,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updatePerson = useCallback<AppContextValue["updatePerson"]>(
     (id, patch) => {
-      update((d) => ({
-        ...d,
-        people: d.people.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-      }));
+      update((d) => ({ ...d, people: d.people.map((p) => (p.id === id ? { ...p, ...patch } : p)) }));
     },
     [update]
   );
 
-  const archivePerson = useCallback(
-    (id: string) => updatePerson(id, { archived: true }),
-    [updatePerson]
-  );
-  const restorePerson = useCallback(
-    (id: string) => updatePerson(id, { archived: false }),
-    [updatePerson]
-  );
+  const archivePerson = useCallback((id: string) => updatePerson(id, { archived: true }), [updatePerson]);
+  const restorePerson = useCallback((id: string) => updatePerson(id, { archived: false }), [updatePerson]);
 
   const deletePerson = useCallback<AppContextValue["deletePerson"]>(
-    (id) => {
-      update((d) => ({ ...d, people: d.people.filter((p) => p.id !== id) }));
-    },
+    (id) => update((d) => ({ ...d, people: d.people.filter((p) => p.id !== id) })),
     [update]
   );
 
   const addGiftIdea = useCallback<AppContextValue["addGiftIdea"]>(
     (personId, idea) => {
-      const newIdea: GiftIdea = {
-        ...idea,
-        id: makeId(),
-        dateAdded: new Date().toISOString().slice(0, 10),
-      };
+      const newIdea: GiftIdea = { ...idea, id: makeId(), dateAdded: new Date().toISOString().slice(0, 10) };
       update((d) => ({
         ...d,
-        people: d.people.map((p) =>
-          p.id === personId ? { ...p, giftIdeas: [...p.giftIdeas, newIdea] } : p
-        ),
+        people: d.people.map((p) => (p.id === personId ? { ...p, giftIdeas: [...p.giftIdeas, newIdea] } : p)),
       }));
     },
     [update]
@@ -113,10 +228,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ...d,
         people: d.people.map((p) =>
           p.id === personId
-            ? {
-                ...p,
-                giftIdeas: p.giftIdeas.map((g) => (g.id === ideaId ? { ...g, ...patch } : g)),
-              }
+            ? { ...p, giftIdeas: p.giftIdeas.map((g) => (g.id === ideaId ? { ...g, ...patch } : g)) }
             : p
         ),
       }));
@@ -129,9 +241,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       update((d) => ({
         ...d,
         people: d.people.map((p) =>
-          p.id === personId
-            ? { ...p, giftIdeas: p.giftIdeas.filter((g) => g.id !== ideaId) }
-            : p
+          p.id === personId ? { ...p, giftIdeas: p.giftIdeas.filter((g) => g.id !== ideaId) } : p
         ),
       }));
     },
@@ -153,20 +263,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const exportData = useCallback(() => storage.exportJSON(data), [data]);
-
-  const replaceAll = useCallback<AppContextValue["replaceAll"]>(
-    (next) => setData(storage.normalizeData(next)),
-    []
-  );
-
-  const importData = useCallback<AppContextValue["importData"]>(
-    (json) => setData(storage.importJSON(json)),
-    []
-  );
-
-  const resetToSample = useCallback(() => setData(storage.resetToSample()), []);
-
+  const replaceAll = useCallback<AppContextValue["replaceAll"]>((next) => setData(storage.normalizeData(next)), []);
+  const importData = useCallback<AppContextValue["importData"]>((json) => setData(storage.importJSON(json)), []);
+  const resetToSample = useCallback(() => {
+    const seeded = sampleData();
+    setData(seeded);
+    if (MODE === "local") storage.save(seeded);
+  }, []);
   const getPerson = useCallback((id: string) => data.people.find((p) => p.id === id), [data.people]);
+
+  const signOut = useCallback(() => {
+    if (MODE === "cloud") fbSignOut(getFirebase().auth);
+  }, []);
 
   const value = useMemo<AppContextValue>(
     () => ({
@@ -174,6 +282,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       archived: data.people.filter((p) => p.archived),
       themes: data.themes,
       updatedAt: data.updatedAt,
+      session: { mode: MODE, email: user?.email ?? null, signOut },
       addPerson,
       updatePerson,
       archivePerson,
@@ -192,6 +301,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }),
     [
       data,
+      user,
+      signOut,
       addPerson,
       updatePerson,
       archivePerson,
@@ -209,6 +320,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       replaceAll,
     ]
   );
+
+  // Cloud gating: wait for auth, require sign-in, then wait for first data load.
+  if (MODE === "cloud") {
+    if (!authReady) return <Splash />;
+    if (!user) return <Login />;
+    if (!cloudLoaded) return <Splash />;
+  }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

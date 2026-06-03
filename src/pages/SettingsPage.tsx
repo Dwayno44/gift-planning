@@ -12,6 +12,7 @@ export default function SettingsPage({ onAddPerson, onOpenPerson }: Props) {
     people,
     archived,
     themes,
+    session,
     exportData,
     importData,
     resetToSample,
@@ -84,6 +85,20 @@ export default function SettingsPage({ onAddPerson, onOpenPerson }: Props) {
         >
           {message.text}
         </div>
+      )}
+
+      {/* Account (cloud sync only) */}
+      {session.mode === "cloud" && (
+        <section className="card p-5">
+          <h2 className="text-base font-semibold text-ink">Account</h2>
+          <p className="mt-1 text-sm text-muted">
+            Signed in as <span className="font-medium text-ink">{session.email}</span>. Your list
+            syncs live across every signed-in device.
+          </p>
+          <button className="btn-soft mt-3" onClick={session.signOut}>
+            Sign out
+          </button>
+        </section>
       )}
 
       {/* People */}

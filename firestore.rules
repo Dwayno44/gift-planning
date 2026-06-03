@@ -1,0 +1,25 @@
+rules_version = '2';
+
+// Paste these into: Firebase console → Firestore Database → Rules → Publish.
+// Only the allow-listed emails can read or write the shared household data —
+// this is the REAL access control (the site URL itself is public).
+//
+// Keep this list in sync with ALLOWED_EMAILS in src/lib/firebaseConfig.ts.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isHouseholdMember() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in [
+          "smithdk44@gmail.com"
+          // , "wife@example.com"   // <- add the second person's email
+        ];
+    }
+
+    match /households/{householdId} {
+      allow read, write: if isHouseholdMember();
+    }
+  }
+}
