@@ -82,11 +82,15 @@ export default function App() {
       {/* App bar */}
       <header className="sticky top-0 z-40 border-b border-line bg-cream/90 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center gap-2 px-4 py-3">
-          <img
-            src={`${import.meta.env.BASE_URL}icon.png`}
-            alt=""
-            className="h-9 w-9 rounded-lg object-contain"
-          />
+          <span className="h-10 w-10 shrink-0 overflow-hidden rounded-xl">
+            {/* scale up + clip to crop the icon's internal whitespace so the
+                illustration fills the tile boldly */}
+            <img
+              src={`${import.meta.env.BASE_URL}icon.png`}
+              alt=""
+              className="h-full w-full scale-[1.3] object-cover"
+            />
+          </span>
           <h1 className="text-lg font-bold text-ink">Gift Planner</h1>
           <span className="ml-auto text-sm text-muted">{TITLES[page]}</span>
         </div>
