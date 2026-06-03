@@ -13,8 +13,8 @@ service cloud.firestore {
       return request.auth != null
         && request.auth.token.email_verified == true
         && request.auth.token.email in [
-          "smithdk44@gmail.com"
-          // , "wife@example.com"   // <- add the second person's email
+          "smithdk44@gmail.com",
+          "megan.howe@live.com.au"
         ];
     }
 

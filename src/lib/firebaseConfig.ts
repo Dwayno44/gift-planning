@@ -14,12 +14,12 @@
 // ---------------------------------------------------------------------------
 
 export const firebaseConfig = {
-  apiKey: "REPLACE_ME",
-  authDomain: "REPLACE_ME.firebaseapp.com",
-  projectId: "REPLACE_ME",
-  storageBucket: "REPLACE_ME.firebasestorage.app",
-  messagingSenderId: "REPLACE_ME",
-  appId: "REPLACE_ME",
+  apiKey: "AIzaSyDtVZ5UP1CBKVDT_KHMEtE_1Z1Lu-t9ijk",
+  authDomain: "gift-planner-a342b.firebaseapp.com",
+  projectId: "gift-planner-a342b",
+  storageBucket: "gift-planner-a342b.firebasestorage.app",
+  messagingSenderId: "315394503116",
+  appId: "1:315394503116:web:8cf6d2af9744bfa652ad69",
 };
 
 // Only these email addresses may sign in and access the data. This is a
@@ -27,7 +27,7 @@ export const firebaseConfig = {
 // which must list the same emails.
 export const ALLOWED_EMAILS: string[] = [
   "smithdk44@gmail.com",
-  // "wife@example.com",  // <- add the second person's email here
+  "megan.howe@live.com.au",
 ];
 
 // The single shared household document all signed-in users read/write.
