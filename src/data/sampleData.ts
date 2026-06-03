@@ -30,6 +30,9 @@ const people: Person[] = [
   { id: "p-yvonne", name: "Yvonne", birthday: "1957-06-15", birthYear: 1957, giftIdeas: [] },
   { id: "p-renae", name: "Renae", birthday: "1986-01-17", birthYear: 1986, giftIdeas: [] },
   { id: "p-jake", name: "Jake", birthday: "1991-06-04", birthYear: 1991, giftIdeas: [] },
+  { id: "p-carol", name: "Carol", birthday: "1967-01-07", birthYear: 1967, giftIdeas: [] },
+  { id: "p-steve", name: "Steve", birthday: "1963-09-13", birthYear: 1963, giftIdeas: [] },
+  { id: "p-brett", name: "Brett", birthday: "1989-01-29", birthYear: 1989, giftIdeas: [] },
 ];
 
 export function sampleData(): AppData {
