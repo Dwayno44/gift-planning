@@ -1,9 +1,9 @@
 import type { AppData, Person } from "../types";
 import { CURRENT_VERSION } from "./storage";
 
-// Realistic-but-fake seed data. Birthdays are spread across the year, with a
-// few intentionally placed in the next 4–6 weeks so the Weekly Digest has
-// something to show on first run. No real personal information.
+// Seed data used on first run (and by "Reset to sample data" in Settings).
+// These are the household's real people; everyone starts with no gift ideas
+// (status = red "No ideas yet") ready to be filled in throughout the year.
 
 export const DEFAULT_THEMES = [
   "Books",
@@ -19,162 +19,17 @@ export const DEFAULT_THEMES = [
 ];
 
 const people: Person[] = [
-  {
-    id: "p-rose",
-    name: "Grandma Rose",
-    relationship: "parent",
-    birthday: "1955-06-09",
-    birthYear: 1955,
-    themes: ["Gardening", "Books"],
-    notes: "Loves her roses and a good crime novel.",
-    budget: 60,
-    giftIdeas: [], // intentionally empty → RED, and it's urgent
-  },
-  {
-    id: "p-liam",
-    name: "Liam",
-    relationship: "friend",
-    birthday: "1992-06-22",
-    birthYear: 1992,
-    themes: ["Tech", "Music"],
-    giftIdeas: [
-      {
-        id: "g-liam-1",
-        title: "Wireless earbuds",
-        theme: "Tech",
-        notes: "His old ones are dying.",
-        priority: "medium",
-        status: "idea",
-        dateAdded: "2026-02-11",
-      },
-      {
-        id: "g-liam-2",
-        title: "Vinyl record — favourite band",
-        theme: "Music",
-        priority: "low",
-        status: "idea",
-        dateAdded: "2026-03-02",
-      },
-    ],
-  },
-  {
-    id: "p-maya",
-    name: "Maya",
-    relationship: "child",
-    birthday: "2018-07-04",
-    birthYear: 2018,
-    themes: ["Lego", "Books"],
-    notes: "Into space and dinosaurs.",
-    budget: 40,
-    giftIdeas: [
-      {
-        id: "g-maya-1",
-        title: "Lego space shuttle set",
-        theme: "Lego",
-        purchaseUrl: "https://www.lego.com/",
-        estimatedPrice: 35,
-        store: "Lego",
-        priority: "high",
-        status: "shortlisted",
-        dateAdded: "2026-04-18",
-      },
-      {
-        id: "g-maya-2",
-        title: "Glow-in-the-dark star stickers",
-        theme: "Homeware",
-        estimatedPrice: 12,
-        priority: "low",
-        status: "exploring",
-        dateAdded: "2026-05-01",
-      },
-    ],
-  },
-  {
-    id: "p-peter",
-    name: "Dad (Peter)",
-    relationship: "parent",
-    birthday: "1958-07-12",
-    birthYear: 1958,
-    themes: ["Food", "Gardening"],
-    budget: 80,
-    purchasedGift: "Artisan BBQ spice gift box",
-    birthdayMessageReminderCreated: true,
-    giftIdeas: [
-      {
-        id: "g-peter-1",
-        title: "Artisan BBQ spice gift box",
-        theme: "Food",
-        purchaseUrl: "https://example.com/bbq-box",
-        estimatedPrice: 55,
-        store: "The Spice Merchant",
-        priority: "high",
-        status: "purchased",
-        dateAdded: "2026-03-20",
-      },
-    ],
-  },
-  {
-    id: "p-sophie",
-    name: "Sophie",
-    relationship: "friend",
-    birthday: "1990-09-15",
-    birthYear: 1990,
-    themes: ["Beauty", "Experience"],
-    giftIdeas: [
-      {
-        id: "g-sophie-1",
-        title: "Spa day voucher",
-        theme: "Experience",
-        purchaseUrl: "https://example.com/spa",
-        estimatedPrice: 90,
-        priority: "medium",
-        status: "exploring",
-        dateAdded: "2026-05-10",
-      },
-    ],
-  },
-  {
-    id: "p-noah",
-    name: "Noah",
-    relationship: "child",
-    birthday: "2020-11-02",
-    birthYear: 2020,
-    themes: ["Lego"],
-    notes: "Just turned into a big fan of trucks.",
-    giftIdeas: [],
-  },
-  {
-    id: "p-carol",
-    name: "Aunt Carol",
-    relationship: "family",
-    birthday: "1963-03-22",
-    birthYear: 1963,
-    themes: ["Homeware", "Food"],
-    purchasedGift: "Hand-thrown ceramic mug set",
-    readyToGive: true,
-    birthdayMessageReminderCreated: true,
-    birthdayMessageSent: true,
-    giftIdeas: [
-      {
-        id: "g-carol-1",
-        title: "Ceramic mug set",
-        theme: "Homeware",
-        estimatedPrice: 45,
-        status: "purchased",
-        dateAdded: "2026-01-30",
-      },
-    ],
-  },
-  {
-    id: "p-tom",
-    name: "Tom",
-    relationship: "colleague",
-    birthday: "1988-12-12",
-    birthYear: 1988,
-    themes: ["Food"],
-    notes: "Secret Santa backup ideas welcome.",
-    giftIdeas: [],
-  },
+  { id: "p-oscar", name: "Oscar", relationship: "child", birthday: "2019-05-27", birthYear: 2019, giftIdeas: [] },
+  { id: "p-tilly", name: "Tilly", relationship: "child", birthday: "2020-12-07", birthYear: 2020, giftIdeas: [] },
+  { id: "p-daisy", name: "Daisy", relationship: "child", birthday: "2025-10-23", birthYear: 2025, giftIdeas: [] },
+  { id: "p-megan", name: "Megan", birthday: "1993-03-11", birthYear: 1993, giftIdeas: [] },
+  // Dwayne's birth year intentionally omitted — "2026" was read as the upcoming
+  // birthday, not a birth year (which would show "turning 0"). Add birthYear to track age.
+  { id: "p-dwayne", name: "Dwayne", birthday: "2026-06-07", giftIdeas: [] },
+  { id: "p-stretch", name: "Stretch", birthday: "1958-05-03", birthYear: 1958, giftIdeas: [] },
+  { id: "p-yvonne", name: "Yvonne", birthday: "1957-06-15", birthYear: 1957, giftIdeas: [] },
+  { id: "p-renae", name: "Renae", birthday: "1986-01-17", birthYear: 1986, giftIdeas: [] },
+  { id: "p-jake", name: "Jake", birthday: "1991-06-04", birthYear: 1991, giftIdeas: [] },
 ];
 
 export function sampleData(): AppData {

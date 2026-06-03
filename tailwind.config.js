@@ -18,17 +18,22 @@ export default {
         muted: "#7a716b",
         line: "#eceaf0",
         accent: {
-          DEFAULT: "#7c6aa8", // calm violet — distinct from red/amber/green statuses
-          soft: "#efeaf6",
-          ink: "#5b4d80",
+          DEFAULT: "#2e97de", // azure blue, taken from the app icon's calendar
+          soft: "#e4f1fc",
+          ink: "#1b6ca8",
         },
+        // Each status has a vivid shade (solid bars + dots, cheerful) and a
+        // darker readable shade (chip/label text) that stays legible on white.
         status: {
-          red: "#c2603f",
-          redSoft: "#fbeae3",
-          amber: "#b07d28",
-          amberSoft: "#fbf2dd",
-          green: "#4f8a5b",
-          greenSoft: "#e6f1e8",
+          red: "#d23a22",
+          redVivid: "#f2552f",
+          redSoft: "#fde9e3",
+          amber: "#9c5d08",
+          amberVivid: "#f59e0b",
+          amberSoft: "#fdf0d5",
+          green: "#1f8a4c",
+          greenVivid: "#34b96a",
+          greenSoft: "#e2f6e9",
         },
       },
       borderRadius: {

@@ -50,22 +50,22 @@ export const toneClasses: Record<
   { bar: string; chipBg: string; chipText: string; dot: string }
 > = {
   red: {
-    bar: "bg-status-red",
+    bar: "bg-status-redVivid",
     chipBg: "bg-status-redSoft",
     chipText: "text-status-red",
-    dot: "bg-status-red",
+    dot: "bg-status-redVivid",
   },
   amber: {
-    bar: "bg-status-amber",
+    bar: "bg-status-amberVivid",
     chipBg: "bg-status-amberSoft",
     chipText: "text-status-amber",
-    dot: "bg-status-amber",
+    dot: "bg-status-amberVivid",
   },
   green: {
-    bar: "bg-status-green",
+    bar: "bg-status-greenVivid",
     chipBg: "bg-status-greenSoft",
     chipText: "text-status-green",
-    dot: "bg-status-green",
+    dot: "bg-status-greenVivid",
   },
 };
 
