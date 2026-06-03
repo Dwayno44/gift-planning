@@ -33,6 +33,10 @@ const people: Person[] = [
   { id: "p-carol", name: "Carol", birthday: "1967-01-07", birthYear: 1967, giftIdeas: [] },
   { id: "p-steve", name: "Steve", birthday: "1963-09-13", birthYear: 1963, giftIdeas: [] },
   { id: "p-brett", name: "Brett", birthday: "1989-01-29", birthYear: 1989, giftIdeas: [] },
+  { id: "p-mat", name: "Mat", birthday: "1984-03-20", birthYear: 1984, giftIdeas: [] },
+  { id: "p-jy", name: "Jy", relationship: "child", birthday: "2009-01-14", birthYear: 2009, giftIdeas: [] },
+  { id: "p-beau", name: "Beau", relationship: "child", birthday: "2011-04-08", birthYear: 2011, giftIdeas: [] },
+  { id: "p-ella", name: "Ella", relationship: "child", birthday: "2012-09-18", birthYear: 2012, giftIdeas: [] },
 ];
 
 export function sampleData(): AppData {
