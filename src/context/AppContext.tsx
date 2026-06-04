@@ -1,19 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import {
-  onAuthStateChanged,
-  isSignInWithEmailLink,
-  signInWithEmailLink,
-  signOut as fbSignOut,
-  type User,
-} from "firebase/auth";
+import { onAuthStateChanged, signOut as fbSignOut, type User } from "firebase/auth";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import type { AppData, GiftIdea, Person } from "../types";
 import * as storage from "../data/storage";
 import { sampleData } from "../data/sampleData";
 import { makeId } from "../utils/id";
 import { getFirebase, isEmailAllowed, isFirebaseConfigured, HOUSEHOLD_ID } from "../lib/firebase";
-import Login, { EMAIL_KEY } from "../components/Login";
+import Login from "../components/Login";
 
 // ---------------------------------------------------------------------------
 // AppContext is the app's single data-layer seam. Components never touch
@@ -99,27 +93,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [data]);
 
   // --- Cloud: authentication -------------------------------------------------
+  // Firebase persists the session (local persistence) so this restores the
+  // signed-in user automatically on reload — no re-login per visit.
   useEffect(() => {
     if (MODE !== "cloud") return;
     const { auth } = getFirebase();
-
-    // Finish a magic-link sign-in if we arrived via the email link.
-    (async () => {
-      try {
-        if (isSignInWithEmailLink(auth, window.location.href)) {
-          let email = window.localStorage.getItem(EMAIL_KEY);
-          if (!email) email = window.prompt("Confirm your email to finish signing in") || "";
-          if (email) {
-            await signInWithEmailLink(auth, email, window.location.href);
-            window.localStorage.removeItem(EMAIL_KEY);
-          }
-          window.history.replaceState({}, "", window.location.origin + import.meta.env.BASE_URL);
-        }
-      } catch (err) {
-        console.error("Email-link sign-in failed", err);
-      }
-    })();
-
     return onAuthStateChanged(auth, (u) => {
       if (u && !isEmailAllowed(u.email)) {
         // Authenticated but not on the household allow-list — reject.
