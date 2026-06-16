@@ -258,11 +258,6 @@ const today = new Date();
 const digest = buildDigest(people, today);
 const total = digest.urgent.length + digest.upcoming.length + digest.sorted.length;
 
-if (total === 0 && digest.urgent.length === 0) {
-  console.log("Nothing in the 6-week window — skipping digest email.");
-  process.exit(0);
-}
-
 const { subject, html } = buildEmail(digest, today);
 
 const transporter = nodemailer.createTransport({
