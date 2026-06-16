@@ -44,6 +44,11 @@ interface AppContextValue {
   updateGiftIdea: (personId: string, ideaId: string, patch: Partial<GiftIdea>) => void;
   deleteGiftIdea: (personId: string, ideaId: string) => void;
 
+  addChristmasGiftIdea: (personId: string, idea: Omit<GiftIdea, "id" | "dateAdded">) => void;
+  updateChristmasGiftIdea: (personId: string, ideaId: string, patch: Partial<GiftIdea>) => void;
+  deleteChristmasGiftIdea: (personId: string, ideaId: string) => void;
+  carryOverBirthdayIdeas: (personId: string) => void;
+
   addTheme: (theme: string) => void;
   removeTheme: (theme: string) => void;
 
@@ -226,6 +231,64 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [update]
   );
 
+  const addChristmasGiftIdea = useCallback<AppContextValue["addChristmasGiftIdea"]>(
+    (personId, idea) => {
+      const newIdea: GiftIdea = { ...idea, id: makeId(), dateAdded: new Date().toISOString().slice(0, 10) };
+      update((d) => ({
+        ...d,
+        people: d.people.map((p) =>
+          p.id === personId ? { ...p, christmasGiftIdeas: [...(p.christmasGiftIdeas ?? []), newIdea] } : p
+        ),
+      }));
+    },
+    [update]
+  );
+
+  const updateChristmasGiftIdea = useCallback<AppContextValue["updateChristmasGiftIdea"]>(
+    (personId, ideaId, patch) => {
+      update((d) => ({
+        ...d,
+        people: d.people.map((p) =>
+          p.id === personId
+            ? { ...p, christmasGiftIdeas: (p.christmasGiftIdeas ?? []).map((g) => (g.id === ideaId ? { ...g, ...patch } : g)) }
+            : p
+        ),
+      }));
+    },
+    [update]
+  );
+
+  const deleteChristmasGiftIdea = useCallback<AppContextValue["deleteChristmasGiftIdea"]>(
+    (personId, ideaId) => {
+      update((d) => ({
+        ...d,
+        people: d.people.map((p) =>
+          p.id === personId
+            ? { ...p, christmasGiftIdeas: (p.christmasGiftIdeas ?? []).filter((g) => g.id !== ideaId) }
+            : p
+        ),
+      }));
+    },
+    [update]
+  );
+
+  const carryOverBirthdayIdeas = useCallback<AppContextValue["carryOverBirthdayIdeas"]>(
+    (personId) => {
+      update((d) => ({
+        ...d,
+        people: d.people.map((p) => {
+          if (p.id !== personId) return p;
+          const existingTitles = new Set((p.christmasGiftIdeas ?? []).map((i) => i.title.toLowerCase()));
+          const toCarry = (p.giftIdeas ?? [])
+            .filter((i) => i.status !== "rejected" && !existingTitles.has(i.title.toLowerCase()))
+            .map((i) => ({ ...i, id: makeId(), status: "idea" as const, dateAdded: new Date().toISOString().slice(0, 10) }));
+          return { ...p, christmasGiftIdeas: [...(p.christmasGiftIdeas ?? []), ...toCarry] };
+        }),
+      }));
+    },
+    [update]
+  );
+
   const addTheme = useCallback<AppContextValue["addTheme"]>(
     (theme) => {
       const t = theme.trim();
@@ -270,6 +333,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addGiftIdea,
       updateGiftIdea,
       deleteGiftIdea,
+      addChristmasGiftIdea,
+      updateChristmasGiftIdea,
+      deleteChristmasGiftIdea,
+      carryOverBirthdayIdeas,
       addTheme,
       removeTheme,
       exportData,
@@ -290,6 +357,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addGiftIdea,
       updateGiftIdea,
       deleteGiftIdea,
+      addChristmasGiftIdea,
+      updateChristmasGiftIdea,
+      deleteChristmasGiftIdea,
+      carryOverBirthdayIdeas,
       addTheme,
       removeTheme,
       exportData,

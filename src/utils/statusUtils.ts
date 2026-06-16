@@ -81,6 +81,42 @@ export function hasPurchase(person: Person): boolean {
   );
 }
 
+/** Derive a person's Christmas gift status from their christmas-specific data. */
+export function deriveChristmasStatus(person: Person): StatusMeta {
+  const ideas = person.christmasGiftIdeas ?? [];
+  const activeIdeas = ideas.filter((i) => i.status !== "rejected");
+  const hasPurchase = ideas.some((i) => i.status === "purchased");
+  const hasExplored = activeIdeas.some(
+    (i) => i.status === "exploring" || i.status === "shortlisted" || !!i.purchaseUrl
+  );
+
+  if (person.christmasReadyToGive) {
+    return { status: "ready", label: "Wrapped / ready", tone: "green" };
+  }
+  if (hasPurchase) {
+    return { status: "purchased", label: "Purchased", tone: "green" };
+  }
+  if (hasExplored) {
+    return { status: "options_explored", label: "Options explored", tone: "amber" };
+  }
+  if (activeIdeas.length > 0) {
+    return { status: "ideas_saved", label: "Ideas saved", tone: "amber" };
+  }
+  return { status: "no_ideas", label: "No ideas yet", tone: "red" };
+}
+
+export function christmasSuggestedNextAction(person: Person): string {
+  const { status } = deriveChristmasStatus(person);
+  switch (status) {
+    case "no_ideas": return "Add at least one Christmas gift idea";
+    case "ideas_saved": return "Choose or research a purchase option";
+    case "options_explored": return "Decide and purchase";
+    case "purchased": return "Wrap it up and you're ready";
+    case "ready": return "All sorted for Christmas 🎄";
+    default: return "Add a gift idea";
+  }
+}
+
 /**
  * The single most useful next action for a person, given their status.
  * Drives the "make the next action obvious" UX principle.

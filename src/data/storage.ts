@@ -27,6 +27,7 @@ export function normalizeData(input: unknown): AppData {
     ...p,
     giftIdeas: Array.isArray(p.giftIdeas) ? p.giftIdeas : [],
     themes: Array.isArray(p.themes) ? p.themes : [],
+    christmasGiftIdeas: Array.isArray(p.christmasGiftIdeas) ? p.christmasGiftIdeas : [],
   }));
   return {
     version: CURRENT_VERSION,

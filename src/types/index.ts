@@ -56,6 +56,8 @@ export interface Person {
   birthdayMessageReminderCreated?: boolean;
   birthdayMessageSent?: boolean;
   archived?: boolean;
+  christmasGiftIdeas?: GiftIdea[];
+  christmasReadyToGive?: boolean;
 }
 
 /** Shape of the full persisted document. Versioned so future migrations and
