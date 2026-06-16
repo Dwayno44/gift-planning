@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   type AuthError,
 } from "firebase/auth";
 import { getFirebase, isEmailAllowed } from "../lib/firebase";
@@ -31,6 +32,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetSent, setResetSent] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,6 +81,29 @@ export default function Login() {
     }
   };
 
+  const handleReset = async () => {
+    const addr = email.trim().toLowerCase();
+    if (!addr) {
+      setError("Enter your email address above first.");
+      return;
+    }
+    if (!isEmailAllowed(addr)) {
+      setError("That email isn't on the household list.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const { auth } = getFirebase();
+      await sendPasswordResetEmail(auth, addr);
+      setResetSent(true);
+    } catch {
+      setError("Couldn't send the reset email. Try again in a moment.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-cream flex items-center justify-center px-5">
       <div className="card w-full max-w-sm p-6 text-center">
@@ -90,42 +115,65 @@ export default function Login() {
         <h1 className="text-xl font-bold text-ink">Gift Planner</h1>
         <p className="mt-1 text-sm text-muted">Sign in to see your shared list on any device.</p>
 
-        <form onSubmit={submit} className="mt-5 space-y-3 text-left">
-          <div>
-            <label className="label" htmlFor="login-email">Email</label>
-            <input
-              id="login-email"
-              className="input"
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              value={email}
-              placeholder="you@example.com"
-              onChange={(e) => setEmail(e.target.value)}
-            />
+        {resetSent ? (
+          <div className="mt-5 space-y-3">
+            <p className="text-3xl">📬</p>
+            <p className="font-medium text-ink">Check your email</p>
+            <p className="text-sm text-muted">
+              We sent a password reset link to <span className="font-medium">{email.trim()}</span>. Open it to set your password, then come back and sign in.
+            </p>
+            <button className="btn-ghost w-full" onClick={() => setResetSent(false)}>
+              Back to sign in
+            </button>
           </div>
-          <div>
-            <label className="label" htmlFor="login-password">Password</label>
-            <input
-              id="login-password"
-              className="input"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              placeholder="••••••••"
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-          {error && (
-            <p className="rounded-xl bg-status-redSoft px-3 py-2 text-sm text-status-red">{error}</p>
-          )}
-          <button type="submit" className="btn-primary w-full" disabled={busy || !email.trim() || !password}>
-            {busy ? "Signing in…" : "Sign in"}
-          </button>
-          <p className="text-center text-xs text-muted">
-            First time? Just choose a password — we'll create your account.
-          </p>
-        </form>
+        ) : (
+          <form onSubmit={submit} className="mt-5 space-y-3 text-left">
+            <div>
+              <label className="label" htmlFor="login-email">Email</label>
+              <input
+                id="login-email"
+                className="input"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                value={email}
+                placeholder="you@example.com"
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="label" htmlFor="login-password">Password</label>
+                <button
+                  type="button"
+                  className="text-xs text-accent-ink hover:underline"
+                  onClick={handleReset}
+                  disabled={busy}
+                >
+                  Forgot password?
+                </button>
+              </div>
+              <input
+                id="login-password"
+                className="input"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                placeholder="••••••••"
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            {error && (
+              <p className="rounded-xl bg-status-redSoft px-3 py-2 text-sm text-status-red">{error}</p>
+            )}
+            <button type="submit" className="btn-primary w-full" disabled={busy || !email.trim() || !password}>
+              {busy ? "Signing in…" : "Sign in"}
+            </button>
+            <p className="text-center text-xs text-muted">
+              First time? Just choose a password — we'll create your account.
+            </p>
+          </form>
+        )}
       </div>
     </div>
   );
