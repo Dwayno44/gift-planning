@@ -1,11 +1,12 @@
 name: Weekly Gift Digest
 
-# Runs every Monday at ~8am AEST (Sunday 21:00 UTC).
+# Runs every Monday at 8am AWST (00:00 UTC Monday).
+# AWST is UTC+8 with no daylight saving, so this is always correct.
 # You can also trigger it manually from the GitHub Actions tab.
 
 on:
   schedule:
-    - cron: "0 21 * * 0"
+    - cron: "0 0 * * 1"
   workflow_dispatch:
 
 jobs:
