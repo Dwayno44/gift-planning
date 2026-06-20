@@ -76,12 +76,10 @@ function deriveStatus(person) {
 }
 
 function buildDigest(people, from = new Date()) {
-  const WEEKS = 6;
-  const cutoffDays = WEEKS * 7;
+  const active = people.filter((p) => !p.archived);
 
-  const within6 = people.filter(
-    (p) => !p.archived && daysUntilBirthday(p.birthday, from) <= cutoffDays
-  );
+  const within6 = active.filter((p) => daysUntilBirthday(p.birthday, from) <= 42);
+  const within6Ids = new Set(within6.map((p) => p.id));
 
   const urgent = [];
   const upcoming = [];
@@ -99,12 +97,20 @@ function buildDigest(people, from = new Date()) {
     }
   }
 
+  const horizon = active
+    .filter((p) => {
+      const days = daysUntilBirthday(p.birthday, from);
+      return !within6Ids.has(p.id) && days <= 182;
+    })
+    .map((p) => ({ person: p, days: daysUntilBirthday(p.birthday, from) }))
+    .sort((a, b) => a.days - b.days);
+
   const byDays = (a, b) => a.days - b.days;
   urgent.sort(byDays);
   upcoming.sort(byDays);
   sorted.sort(byDays);
 
-  return { urgent, upcoming, sorted };
+  return { urgent, upcoming, sorted, horizon };
 }
 
 // ---------------------------------------------------------------------------
@@ -150,7 +156,7 @@ function personRow(person, days) {
     </tr>`;
 }
 
-function section(emoji, title, hint, rows, accentColor) {
+function section(emoji, title, hint, rows) {
   if (rows.length === 0) return "";
   return `
     <tr>
@@ -172,22 +178,49 @@ function section(emoji, title, hint, rows, accentColor) {
 }
 
 function buildEmail(digest, today) {
-  const { urgent, upcoming, sorted } = digest;
-  const total = urgent.length + upcoming.length + sorted.length;
+  const { urgent, upcoming, sorted, horizon } = digest;
+  const nearTotal = urgent.length + upcoming.length + sorted.length;
+  const totalAll = nearTotal + horizon.length;
   const dateStr = today.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long" });
 
-  const bodyContent =
-    total === 0
-      ? `<tr><td style="padding: 24px; text-align: center; color: #6B7280;">
-           <div style="font-size: 32px;">🌿</div>
-           <div style="font-weight: 600; color: #111827; margin-top: 8px;">Nothing on the horizon</div>
-           <div style="font-size: 14px; margin-top: 4px;">No birthdays in the next 6 weeks. You're ahead of the game.</div>
+  const nearContent =
+    nearTotal === 0
+      ? `<tr><td style="padding: 20px 0; text-align: center; color: #6B7280;">
+           <div style="font-size: 28px;">🌿</div>
+           <div style="font-weight: 600; color: #111827; margin-top: 8px;">All clear for the next 6 weeks</div>
+           <div style="font-size: 14px; margin-top: 4px;">Nothing urgent — you're ahead of the game.</div>
          </td></tr>`
       : `
-        ${section("🔴", "Needs attention now", "Birthdays within 4 weeks — not sorted yet", urgent, "#DC2626")}
-        ${section("🟡", "Coming up soon", "Birthdays within 6 weeks", upcoming, "#D97706")}
-        ${section("✅", "Already sorted", "Gift ready to go", sorted, "#059669")}
+        ${section("🔴", "Needs attention now", "Birthdays within 4 weeks — not sorted yet", urgent)}
+        ${section("🟡", "Coming up soon", "Birthdays within 6 weeks", upcoming)}
+        ${section("✅", "Already sorted", "Gift ready to go", sorted)}
       `;
+
+  const horizonContent = horizon.length > 0
+    ? `
+      <tr><td style="padding: 20px 0 8px; border-top: 1px solid #E5E7EB;">
+        <div style="font-size: 16px; font-weight: 700; color: #111827;">
+          📅 On the horizon
+          <span style="font-weight: 400; color: #6B7280; font-size: 13px; margin-left: 6px;">${horizon.length}</span>
+        </div>
+        <div style="font-size: 13px; color: #9CA3AF; margin-top: 2px;">Birthdays 6 weeks to 6 months away — good time to start thinking</div>
+      </td></tr>
+      <tr>
+        <td style="background: #fff; border-radius: 12px; border: 1px solid #E5E7EB; padding: 0 16px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            ${horizon.map(({ person, days }) => personRow(person, days)).join("")}
+          </table>
+        </td>
+      </tr>`
+    : "";
+
+  const bodyContent = totalAll === 0
+    ? `<tr><td style="padding: 24px; text-align: center; color: #6B7280;">
+         <div style="font-size: 32px;">🌿</div>
+         <div style="font-weight: 600; color: #111827; margin-top: 8px;">Nothing coming up</div>
+         <div style="font-size: 14px; margin-top: 4px;">No birthdays in the next 6 months. Enjoy the calm.</div>
+       </td></tr>`
+    : `${nearContent}${horizonContent}`;
 
   const subjectCount = urgent.length > 0 ? ` — ${urgent.length} need${urgent.length === 1 ? "s" : ""} attention` : "";
 
@@ -275,4 +308,4 @@ await transporter.sendMail({
   html,
 });
 
-console.log(`Digest sent to ${RECIPIENTS.join(", ")} — ${digest.urgent.length} urgent, ${digest.upcoming.length} upcoming, ${digest.sorted.length} sorted.`);
+console.log(`Digest sent to ${RECIPIENTS.join(", ")} — ${digest.urgent.length} urgent, ${digest.upcoming.length} upcoming, ${digest.sorted.length} sorted, ${digest.horizon.length} on horizon.`);
