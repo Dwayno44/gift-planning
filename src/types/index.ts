@@ -60,11 +60,33 @@ export interface Person {
   christmasReadyToGive?: boolean;
 }
 
+export type OccasionType =
+  | "baby_shower"
+  | "wedding"
+  | "anniversary"
+  | "housewarming"
+  | "graduation"
+  | "engagement"
+  | "other";
+
+export interface Occasion {
+  id: string;
+  title: string;      // e.g. "Sarah & Tom's Wedding"
+  type: OccasionType;
+  date: string;       // YYYY-MM-DD — specific one-off date, not recurring
+  giftIdeas: GiftIdea[];
+  budget?: number;
+  notes?: string;
+  readyToGive?: boolean;
+  archived?: boolean;
+}
+
 /** Shape of the full persisted document. Versioned so future migrations and
  *  cloud sync (Supabase/Firebase/etc.) can be added without breaking imports. */
 export interface AppData {
   version: number;
   people: Person[];
+  occasions: Occasion[];
   themes: string[];
   updatedAt: string;
   /**

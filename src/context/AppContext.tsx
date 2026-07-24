@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from "react";
 import { onAuthStateChanged, signOut as fbSignOut, type User } from "firebase/auth";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
-import type { AppData, GiftIdea, Person } from "../types";
+import type { AppData, GiftIdea, Occasion, Person } from "../types";
 import * as storage from "../data/storage";
 import { sampleData } from "../data/sampleData";
 import { makeId } from "../utils/id";
@@ -29,6 +29,7 @@ interface Session {
 interface AppContextValue {
   people: Person[];
   archived: Person[];
+  occasions: Occasion[];
   themes: string[];
   updatedAt: string;
   session: Session;
@@ -49,6 +50,14 @@ interface AppContextValue {
   deleteChristmasGiftIdea: (personId: string, ideaId: string) => void;
   carryOverBirthdayIdeas: (personId: string) => void;
 
+  addOccasion: (data: Omit<Occasion, "id" | "giftIdeas">) => Occasion;
+  updateOccasion: (id: string, patch: Partial<Occasion>) => void;
+  archiveOccasion: (id: string) => void;
+  deleteOccasion: (id: string) => void;
+  addOccasionGiftIdea: (occasionId: string, idea: Omit<GiftIdea, "id" | "dateAdded">) => void;
+  updateOccasionGiftIdea: (occasionId: string, ideaId: string, patch: Partial<GiftIdea>) => void;
+  deleteOccasionGiftIdea: (occasionId: string, ideaId: string) => void;
+
   addTheme: (theme: string) => void;
   removeTheme: (theme: string) => void;
 
@@ -66,7 +75,7 @@ const HOUSEHOLD_PATH = ["households", HOUSEHOLD_ID] as const;
 /** Content fingerprint that ignores volatile fields (updatedAt/version), used
  *  to skip echo-writes when a change actually came from a remote snapshot. */
 function fingerprint(d: AppData): string {
-  return JSON.stringify({ people: d.people, themes: d.themes, appliedSeedIds: d.appliedSeedIds ?? [] });
+  return JSON.stringify({ people: d.people, themes: d.themes, occasions: d.occasions ?? [], appliedSeedIds: d.appliedSeedIds ?? [] });
 }
 
 function Splash() {
@@ -289,6 +298,67 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [update]
   );
 
+  const addOccasion = useCallback<AppContextValue["addOccasion"]>(
+    (input) => {
+      const occasion: Occasion = { ...input, id: makeId(), giftIdeas: [] };
+      update((d) => ({ ...d, occasions: [...(d.occasions ?? []), occasion] }));
+      return occasion;
+    },
+    [update]
+  );
+
+  const updateOccasion = useCallback<AppContextValue["updateOccasion"]>(
+    (id, patch) => {
+      update((d) => ({ ...d, occasions: (d.occasions ?? []).map((o) => (o.id === id ? { ...o, ...patch } : o)) }));
+    },
+    [update]
+  );
+
+  const archiveOccasion = useCallback((id: string) => updateOccasion(id, { archived: true }), [updateOccasion]);
+  const deleteOccasion = useCallback<AppContextValue["deleteOccasion"]>(
+    (id) => update((d) => ({ ...d, occasions: (d.occasions ?? []).filter((o) => o.id !== id) })),
+    [update]
+  );
+
+  const addOccasionGiftIdea = useCallback<AppContextValue["addOccasionGiftIdea"]>(
+    (occasionId, idea) => {
+      const newIdea: GiftIdea = { ...idea, id: makeId(), dateAdded: new Date().toISOString().slice(0, 10) };
+      update((d) => ({
+        ...d,
+        occasions: (d.occasions ?? []).map((o) =>
+          o.id === occasionId ? { ...o, giftIdeas: [...o.giftIdeas, newIdea] } : o
+        ),
+      }));
+    },
+    [update]
+  );
+
+  const updateOccasionGiftIdea = useCallback<AppContextValue["updateOccasionGiftIdea"]>(
+    (occasionId, ideaId, patch) => {
+      update((d) => ({
+        ...d,
+        occasions: (d.occasions ?? []).map((o) =>
+          o.id === occasionId
+            ? { ...o, giftIdeas: o.giftIdeas.map((g) => (g.id === ideaId ? { ...g, ...patch } : g)) }
+            : o
+        ),
+      }));
+    },
+    [update]
+  );
+
+  const deleteOccasionGiftIdea = useCallback<AppContextValue["deleteOccasionGiftIdea"]>(
+    (occasionId, ideaId) => {
+      update((d) => ({
+        ...d,
+        occasions: (d.occasions ?? []).map((o) =>
+          o.id === occasionId ? { ...o, giftIdeas: o.giftIdeas.filter((g) => g.id !== ideaId) } : o
+        ),
+      }));
+    },
+    [update]
+  );
+
   const addTheme = useCallback<AppContextValue["addTheme"]>(
     (theme) => {
       const t = theme.trim();
@@ -321,6 +391,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     () => ({
       people: data.people.filter((p) => !p.archived),
       archived: data.people.filter((p) => p.archived),
+      occasions: (data.occasions ?? []).filter((o) => !o.archived),
       themes: data.themes,
       updatedAt: data.updatedAt,
       session: { mode: MODE, email: user?.email ?? null, signOut },
@@ -337,6 +408,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateChristmasGiftIdea,
       deleteChristmasGiftIdea,
       carryOverBirthdayIdeas,
+      addOccasion,
+      updateOccasion,
+      archiveOccasion,
+      deleteOccasion,
+      addOccasionGiftIdea,
+      updateOccasionGiftIdea,
+      deleteOccasionGiftIdea,
       addTheme,
       removeTheme,
       exportData,
@@ -361,6 +439,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateChristmasGiftIdea,
       deleteChristmasGiftIdea,
       carryOverBirthdayIdeas,
+      addOccasion,
+      updateOccasion,
+      archiveOccasion,
+      deleteOccasion,
+      addOccasionGiftIdea,
+      updateOccasionGiftIdea,
+      deleteOccasionGiftIdea,
       addTheme,
       removeTheme,
       exportData,

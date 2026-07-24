@@ -2,7 +2,7 @@ import type { GiftStatus, Person } from "../types";
 
 export type StatusTone = "red" | "amber" | "green";
 
-interface StatusMeta {
+export interface StatusMeta {
   status: GiftStatus;
   label: string;
   tone: StatusTone;

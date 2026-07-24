@@ -14,7 +14,7 @@ const STORAGE_KEY = "gift-planner:data";
 export const CURRENT_VERSION = 1;
 
 export function emptyData(): AppData {
-  return { version: CURRENT_VERSION, people: [], themes: [], updatedAt: new Date().toISOString() };
+  return { version: CURRENT_VERSION, people: [], occasions: [], themes: [], updatedAt: new Date().toISOString() };
 }
 
 /** Basic shape validation + light migration hook for imported/old data. */
@@ -29,9 +29,14 @@ export function normalizeData(input: unknown): AppData {
     themes: Array.isArray(p.themes) ? p.themes : [],
     christmasGiftIdeas: Array.isArray(p.christmasGiftIdeas) ? p.christmasGiftIdeas : [],
   }));
+  const occasions = Array.isArray(data.occasions)
+    ? data.occasions.map((o) => ({ ...o, giftIdeas: Array.isArray(o.giftIdeas) ? o.giftIdeas : [] }))
+    : [];
+
   return {
     version: CURRENT_VERSION,
     people,
+    occasions,
     themes: Array.isArray(data.themes) ? data.themes : [],
     updatedAt: data.updatedAt ?? new Date().toISOString(),
     appliedSeedIds: Array.isArray(data.appliedSeedIds) ? data.appliedSeedIds : undefined,

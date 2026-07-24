@@ -4,11 +4,12 @@ import BirthdaysPage from "./pages/BirthdaysPage";
 import WeeklyDigestPage from "./pages/WeeklyDigestPage";
 import SettingsPage from "./pages/SettingsPage";
 import ChristmasPage from "./pages/ChristmasPage";
+import EventsPage from "./pages/EventsPage";
 import Modal from "./components/Modal";
 import PersonDetail from "./components/PersonDetail";
 import PersonForm from "./components/PersonForm";
 
-type Page = "birthdays" | "digest" | "christmas" | "settings";
+type Page = "birthdays" | "digest" | "christmas" | "events" | "settings";
 
 interface NavItem {
   page: Page;
@@ -46,6 +47,17 @@ const NAV: NavItem[] = [
     ),
   },
   {
+    page: "events",
+    label: "Events",
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="3" y="4" width="18" height="18" rx="2" />
+        <path d="M16 2v4M8 2v4M3 10h18" strokeLinecap="round" />
+        <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     page: "settings",
     label: "Settings",
     icon: (
@@ -61,6 +73,7 @@ const TITLES: Record<Page, string> = {
   birthdays: "Birthdays",
   digest: "Weekly digest",
   christmas: "Christmas",
+  events: "Events",
   settings: "Settings",
 };
 
@@ -101,6 +114,7 @@ export default function App() {
         {page === "birthdays" && <BirthdaysPage onOpenPerson={openPerson} onAddPerson={openAdd} />}
         {page === "digest" && <WeeklyDigestPage onOpenPerson={openPerson} />}
         {page === "christmas" && <ChristmasPage />}
+        {page === "events" && <EventsPage />}
         {page === "settings" && <SettingsPage onOpenPerson={openPerson} onAddPerson={openAdd} />}
       </main>
 

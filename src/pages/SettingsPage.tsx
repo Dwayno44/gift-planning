@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
+import { addDoc, collection } from "firebase/firestore";
 import { useApp } from "../context/AppContext";
 import { formatBirthdayShort } from "../utils/birthdayUtils";
+import { getFirebase, isFirebaseConfigured } from "../lib/firebase";
 
 interface Props {
   onAddPerson: () => void;
@@ -25,6 +27,8 @@ export default function SettingsPage({ onAddPerson, onOpenPerson }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [newTheme, setNewTheme] = useState("");
   const [message, setMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackSending, setFeedbackSending] = useState(false);
 
   const flash = (kind: "ok" | "err", text: string) => {
     setMessage({ kind, text });
@@ -51,6 +55,31 @@ export default function SettingsPage({ onAddPerson, onOpenPerson }: Props) {
       flash("ok", "Data copied to clipboard.");
     } catch {
       flash("err", "Couldn't copy — try the download instead.");
+    }
+  };
+
+  const handleFeedback = async () => {
+    const text = feedbackText.trim();
+    if (!text) return;
+    setFeedbackSending(true);
+    try {
+      if (isFirebaseConfigured()) {
+        const { db } = getFirebase();
+        await addDoc(collection(db, "feedback"), {
+          text,
+          email: session.email ?? "unknown",
+          createdAt: new Date().toISOString(),
+        });
+      } else {
+        // local mode — open a mailto as fallback
+        window.open(`mailto:smithdk44@gmail.com?subject=Gift%20Planner%20feedback&body=${encodeURIComponent(text)}`);
+      }
+      setFeedbackText("");
+      flash("ok", "Thanks! Feedback sent.");
+    } catch {
+      flash("err", "Couldn't send feedback — try again.");
+    } finally {
+      setFeedbackSending(false);
     }
   };
 
@@ -218,6 +247,27 @@ export default function SettingsPage({ onAddPerson, onOpenPerson }: Props) {
           </ul>
         </section>
       )}
+
+      {/* Feedback */}
+      <section className="card p-5">
+        <h2 className="text-base font-semibold text-ink">Send feedback</h2>
+        <p className="mt-1 text-sm text-muted">
+          Something broken? Missing a feature? Let us know.
+        </p>
+        <textarea
+          className="input mt-3 min-h-[88px] resize-y"
+          placeholder="What's on your mind…"
+          value={feedbackText}
+          onChange={(e) => setFeedbackText(e.target.value)}
+        />
+        <button
+          className="btn-primary mt-2 w-full"
+          disabled={!feedbackText.trim() || feedbackSending}
+          onClick={handleFeedback}
+        >
+          {feedbackSending ? "Sending…" : "Send feedback"}
+        </button>
+      </section>
 
       {/* Danger zone */}
       <section className="card p-5">
