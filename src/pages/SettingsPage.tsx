@@ -116,18 +116,49 @@ export default function SettingsPage({ onAddPerson, onOpenPerson }: Props) {
         </div>
       )}
 
-      {/* Account (cloud sync only) */}
+      {/* Account + household (cloud sync only) */}
       {session.mode === "cloud" && (
-        <section className="card p-5">
-          <h2 className="text-base font-semibold text-ink">Account</h2>
-          <p className="mt-1 text-sm text-muted">
-            Signed in as <span className="font-medium text-ink">{session.email}</span>. Your list
-            syncs live across every signed-in device.
-          </p>
-          <button className="btn-soft mt-3" onClick={session.signOut}>
-            Sign out
-          </button>
-        </section>
+        <>
+          <section className="card p-5">
+            <h2 className="text-base font-semibold text-ink">Account</h2>
+            <p className="mt-1 text-sm text-muted">
+              Signed in as <span className="font-medium text-ink">{session.email}</span>. Your list
+              syncs live across every signed-in device.
+            </p>
+            <button className="btn-soft mt-3" onClick={session.signOut}>
+              Sign out
+            </button>
+          </section>
+
+          {session.inviteCode && (
+            <section className="card p-5">
+              <h2 className="text-base font-semibold text-ink">
+                {session.householdName ?? "Household"}
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                Share this code with friends or family so they can join your household and see the shared list.
+              </p>
+              <div className="mt-3 flex items-center gap-3 rounded-xl bg-accent-soft px-4 py-3">
+                <span className="font-mono text-2xl font-bold tracking-[0.2em] text-accent-ink">
+                  {session.inviteCode}
+                </span>
+                <button
+                  className="btn-soft ml-auto px-3 py-1.5 text-sm"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(session.inviteCode!);
+                      flash("ok", "Invite code copied!");
+                    } catch {
+                      flash("err", "Couldn't copy — select the code manually.");
+                    }
+                  }}
+                >
+                  Copy
+                </button>
+              </div>
+            </section>
+          )}
+        </>
       )}
 
       {/* People */}

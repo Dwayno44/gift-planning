@@ -1,29 +1,28 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { onAuthStateChanged, signOut as fbSignOut, type User } from "firebase/auth";
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
 import type { AppData, GiftIdea, Occasion, Person } from "../types";
 import * as storage from "../data/storage";
 import { sampleData } from "../data/sampleData";
 import { makeId } from "../utils/id";
-import { getFirebase, isEmailAllowed, isFirebaseConfigured, HOUSEHOLD_ID } from "../lib/firebase";
+import { getFirebase, isFirebaseConfigured, getUserHouseholdId } from "../lib/firebase";
+import type { HouseholdMeta } from "../lib/firebase";
 import Login from "../components/Login";
+import Onboarding from "../components/Onboarding";
 
 // ---------------------------------------------------------------------------
-// AppContext is the app's single data-layer seam. Components never touch
-// storage directly — they go through here.
-//
-// Two persistence modes, chosen once at startup:
-//   • local — Firebase not configured → per-device LocalStorage (original behaviour).
-//   • cloud — Firebase configured → email-link auth + a shared Firestore document
-//             that syncs live across every signed-in device.
-// The component-facing API is identical in both modes.
+// AppContext — single data-layer seam; two persistence modes:
+//   local — no Firebase → per-device LocalStorage
+//   cloud — Firebase → email+password auth + per-household Firestore doc
 // ---------------------------------------------------------------------------
 
 interface Session {
   mode: "local" | "cloud";
   email: string | null;
   signOut: () => void;
+  householdName: string | null;
+  inviteCode: string | null;
 }
 
 interface AppContextValue {
@@ -70,10 +69,7 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 const MODE: "local" | "cloud" = isFirebaseConfigured() ? "cloud" : "local";
-const HOUSEHOLD_PATH = ["households", HOUSEHOLD_ID] as const;
 
-/** Content fingerprint that ignores volatile fields (updatedAt/version), used
- *  to skip echo-writes when a change actually came from a remote snapshot. */
 function fingerprint(d: AppData): string {
   return JSON.stringify({ people: d.people, themes: d.themes, occasions: d.occasions ?? [], appliedSeedIds: d.appliedSeedIds ?? [] });
 }
@@ -94,9 +90,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     MODE === "local" ? storage.load() : storage.emptyData()
   );
 
-  // Cloud-only auth/loading state. In local mode these start "ready".
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(MODE === "local");
+  const [householdMeta, setHouseholdMeta] = useState<HouseholdMeta | null>(null);
+  const [onboardingNeeded, setOnboardingNeeded] = useState(false);
   const [cloudLoaded, setCloudLoaded] = useState(MODE === "local");
   const lastSyncedRef = useRef<string | null>(null);
 
@@ -107,72 +104,155 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [data]);
 
   // --- Cloud: authentication -------------------------------------------------
-  // Firebase persists the session (local persistence) so this restores the
-  // signed-in user automatically on reload — no re-login per visit.
   useEffect(() => {
     if (MODE !== "cloud") return;
     const { auth } = getFirebase();
     return onAuthStateChanged(auth, (u) => {
-      if (u && !isEmailAllowed(u.email)) {
-        // Authenticated but not on the household allow-list — reject.
-        fbSignOut(auth);
-        setUser(null);
-      } else {
-        setUser(u);
-      }
+      setUser(u);
       setAuthReady(true);
+      if (!u) {
+        // Reset household state on sign-out
+        setHouseholdMeta(null);
+        setOnboardingNeeded(false);
+        setCloudLoaded(false);
+      }
     });
   }, []);
 
-  // --- Cloud: live subscription to the shared household document -------------
+  // --- Cloud: resolve household for this user (runs when user changes) -------
   useEffect(() => {
     if (MODE !== "cloud" || !user) return;
+
+    setHouseholdMeta(null);
+    setOnboardingNeeded(false);
+    setCloudLoaded(false);
+
+    const resolveHousehold = async () => {
+      const { db } = getFirebase();
+
+      // Check for an existing userHousehold membership doc
+      const hId = await getUserHouseholdId(user.uid);
+      if (hId) {
+        // Load the household metadata (name + invite code)
+        const hSnap = await getDoc(doc(db, "households", hId));
+        const hData = hSnap.data() ?? {};
+        setHouseholdMeta({
+          householdId: hId,
+          name: hData.name ?? "Household",
+          inviteCode: hData.inviteCode ?? "",
+          adminUid: hData.adminUid ?? "",
+        });
+        return;
+      }
+
+      // No membership — check for a legacy "main" household this user can access.
+      // The legacy Firestore rule still allows the original emails to read "main"
+      // during the migration window, so a successful getDoc means they're legacy.
+      try {
+        const mainSnap = await getDoc(doc(db, "households", "main"));
+        if (mainSnap.exists()) {
+          const mainData = mainSnap.data();
+          // Ensure the legacy doc has metadata
+          let inviteCode: string = mainData.inviteCode ?? "";
+          if (!inviteCode) {
+            const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+            inviteCode = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+            await updateDoc(doc(db, "households", "main"), {
+              name: mainData.name ?? "Our Household",
+              inviteCode,
+              adminUid: user.uid,
+            });
+            await setDoc(doc(db, "inviteCodes", inviteCode), {
+              householdId: "main",
+              createdAt: new Date().toISOString(),
+            });
+          }
+          // Create membership for this legacy user
+          await setDoc(doc(db, "userHouseholds", user.uid), {
+            householdId: "main",
+            joinedAt: new Date().toISOString(),
+          });
+          setHouseholdMeta({
+            householdId: "main",
+            name: mainData.name ?? "Our Household",
+            inviteCode,
+            adminUid: mainData.adminUid ?? user.uid,
+          });
+          return;
+        }
+      } catch {
+        // getDoc threw (permission denied) — not a legacy user
+      }
+
+      setOnboardingNeeded(true);
+    };
+
+    resolveHousehold();
+  }, [user]);
+
+  // --- Cloud: live subscription to household doc (runs when householdMeta changes) ---
+  useEffect(() => {
+    if (MODE !== "cloud" || !user || !householdMeta) return;
     const { db } = getFirebase();
-    const ref = doc(db, ...HOUSEHOLD_PATH);
+    const ref = doc(db, "households", householdMeta.householdId);
 
     return onSnapshot(
       ref,
       async (snap) => {
         if (!snap.exists()) {
-          // First ever sign-in: seed the shared document.
-          const seeded = sampleData();
-          lastSyncedRef.current = fingerprint(seeded);
-          await setDoc(ref, seeded);
-          setData(seeded);
+          // Household was created empty (via createHousehold); seed with sample for legacy "main".
+          if (householdMeta.householdId === "main") {
+            const seeded = sampleData();
+            lastSyncedRef.current = fingerprint(seeded);
+            await setDoc(ref, { ...seeded, ...householdMeta }, { merge: true });
+            setData(seeded);
+          }
           setCloudLoaded(true);
           return;
         }
         const remote = storage.normalizeData(snap.data());
-        const merged = storage.mergeSeedAdditions(remote);
+        // Only merge seed additions for the original household
+        const merged = householdMeta.householdId === "main"
+          ? storage.mergeSeedAdditions(remote)
+          : remote;
         if (fingerprint(merged) !== fingerprint(remote)) {
-          // New seed people were added since last time — persist the merge.
           lastSyncedRef.current = fingerprint(merged);
-          await setDoc(ref, merged);
+          await setDoc(ref, merged, { merge: true });
         } else {
           lastSyncedRef.current = fingerprint(remote);
+        }
+        // Keep householdMeta in sync if name/inviteCode changed
+        const d = snap.data();
+        if (d.name || d.inviteCode) {
+          setHouseholdMeta((prev) => prev ? {
+            ...prev,
+            name: d.name ?? prev.name,
+            inviteCode: d.inviteCode ?? prev.inviteCode,
+          } : prev);
         }
         setData(merged);
         setCloudLoaded(true);
       },
       (err) => console.error("Firestore subscription error", err)
     );
-  }, [user]);
+  }, [user, householdMeta?.householdId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Cloud: debounced write on local changes (skips remote echoes) ---------
   useEffect(() => {
-    if (MODE !== "cloud" || !user || !cloudLoaded) return;
+    if (MODE !== "cloud" || !user || !cloudLoaded || !householdMeta) return;
     const fp = fingerprint(data);
     if (fp === lastSyncedRef.current) return;
     const { db } = getFirebase();
-    const ref = doc(db, ...HOUSEHOLD_PATH);
+    const ref = doc(db, "households", householdMeta.householdId);
     const t = setTimeout(() => {
       lastSyncedRef.current = fp;
-      setDoc(ref, { ...data, updatedAt: new Date().toISOString() }).catch((e) =>
+      // merge: true preserves household metadata fields (name, inviteCode, adminUid)
+      setDoc(ref, { ...data, updatedAt: new Date().toISOString() }, { merge: true }).catch((e) =>
         console.error("Cloud save failed", e)
       );
     }, 600);
     return () => clearTimeout(t);
-  }, [data, user, cloudLoaded]);
+  }, [data, user, cloudLoaded, householdMeta]);
 
   // --- Mutations (identical in both modes) -----------------------------------
   const update = useCallback((mutate: (draft: AppData) => AppData) => {
@@ -394,7 +474,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       occasions: (data.occasions ?? []).filter((o) => !o.archived),
       themes: data.themes,
       updatedAt: data.updatedAt,
-      session: { mode: MODE, email: user?.email ?? null, signOut },
+      session: {
+        mode: MODE,
+        email: user?.email ?? null,
+        signOut,
+        householdName: householdMeta?.name ?? null,
+        inviteCode: householdMeta?.inviteCode ?? null,
+      },
       addPerson,
       updatePerson,
       archivePerson,
@@ -425,6 +511,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [
       data,
       user,
+      householdMeta,
       signOut,
       addPerson,
       updatePerson,
@@ -455,11 +542,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     ]
   );
 
-  // Cloud gating: wait for auth, require sign-in, then wait for first data load.
+  // Cloud gating: auth → onboarding (if needed) → data load
   if (MODE === "cloud") {
     if (!authReady) return <Splash />;
     if (!user) return <Login />;
-    if (!cloudLoaded) return <Splash />;
+    if (onboardingNeeded) {
+      return (
+        <Onboarding
+          user={user}
+          onComplete={(meta) => {
+            setHouseholdMeta(meta);
+            setOnboardingNeeded(false);
+          }}
+        />
+      );
+    }
+    if (!householdMeta || !cloudLoaded) return <Splash />;
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -5,7 +5,7 @@ import {
   sendPasswordResetEmail,
   type AuthError,
 } from "firebase/auth";
-import { getFirebase, isEmailAllowed } from "../lib/firebase";
+import { getFirebase } from "../lib/firebase";
 
 /** Map Firebase auth error codes to friendly, non-technical messages. */
 function friendly(code: string | undefined): string {
@@ -38,10 +38,6 @@ export default function Login() {
     e.preventDefault();
     const addr = email.trim().toLowerCase();
     if (!addr || !password) return;
-    if (!isEmailAllowed(addr)) {
-      setError("That email isn't on the household list. Check the address, or ask to be added.");
-      return;
-    }
     if (password.length < 6) {
       setError("Pick a password of at least 6 characters.");
       return;
@@ -87,10 +83,6 @@ export default function Login() {
       setError("Enter your email address above first.");
       return;
     }
-    if (!isEmailAllowed(addr)) {
-      setError("That email isn't on the household list.");
-      return;
-    }
     setBusy(true);
     setError(null);
     try {
@@ -113,7 +105,7 @@ export default function Login() {
           className="mx-auto mb-4 h-16 w-16 rounded-2xl object-contain"
         />
         <h1 className="text-xl font-bold text-ink">Gift Planner</h1>
-        <p className="mt-1 text-sm text-muted">Sign in to see your shared list on any device.</p>
+        <p className="mt-1 text-sm text-muted">Sign in or create an account to get started.</p>
 
         {resetSent ? (
           <div className="mt-5 space-y-3">

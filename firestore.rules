@@ -1,24 +1,54 @@
 rules_version = '2';
 
-// Paste these into: Firebase console → Firestore Database → Rules → Publish.
-// Only the allow-listed emails can read or write the shared household data —
-// this is the REAL access control (the site URL itself is public).
+// Multi-tenant Gift Planner rules.
 //
-// Keep this list in sync with ALLOWED_EMAILS in src/lib/firebaseConfig.ts.
+// Each household is a separate Firestore document. A user's membership is
+// recorded in userHouseholds/{uid}. The household invite code lives in
+// inviteCodes/{code}.
+//
+// LEGACY RULE: the original "main" household is still readable/writable by
+// the two founding emails during the migration window. Once both users have
+// been auto-migrated (userHouseholds docs created), the legacy block can be
+// removed and the rules re-published.
+//
+// Paste into: Firebase console → Firestore Database → Rules → Publish.
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isHouseholdMember() {
-      return request.auth != null
-        && request.auth.token.email in [
-          "smithdk44@gmail.com",
-          "megan.howe@live.com.au"
-        ];
+    // Each user's own membership record — only they can read/write it.
+    match /userHouseholds/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Invite codes — any signed-in user can read (to join), any can create.
+    match /inviteCodes/{code} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
     }
 
     match /households/{householdId} {
-      allow read, write: if isHouseholdMember();
+      // New rule: authenticated users who are members of this household.
+      allow read, write: if request.auth != null
+        && exists(/databases/$(database)/documents/userHouseholds/$(request.auth.uid))
+        && get(/databases/$(database)/documents/userHouseholds/$(request.auth.uid)).data.householdId == householdId;
+
+      // New household creation: the creator sets adminUid = their own uid.
+      allow create: if request.auth != null
+        && request.resource.data.adminUid == request.auth.uid;
+
+      // LEGACY: original two users can still access "main" while migration runs.
+      allow read, write: if request.auth != null
+        && householdId == "main"
+        && request.auth.token.email in [
+             "smithdk44@gmail.com",
+             "megan.howe@live.com.au"
+           ];
+    }
+
+    // Feedback submissions — any signed-in user can create; no one can read.
+    match /feedback/{docId} {
+      allow create: if request.auth != null;
     }
   }
 }

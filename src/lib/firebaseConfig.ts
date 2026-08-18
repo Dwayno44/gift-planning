@@ -25,10 +25,4 @@ export const firebaseConfig = {
 // Only these email addresses may sign in and access the data. This is a
 // convenience check for nicer UX; the REAL enforcement is in firestore.rules,
 // which must list the same emails.
-export const ALLOWED_EMAILS: string[] = [
-  "smithdk44@gmail.com",
-  "megan.howe@live.com.au",
-];
-
-// The single shared household document all signed-in users read/write.
-export const HOUSEHOLD_ID = "main";
+// No longer used — household membership is managed in Firestore, not a hardcoded list.
