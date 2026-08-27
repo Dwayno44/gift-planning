@@ -130,8 +130,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const resolveHousehold = async () => {
       const { db } = getFirebase();
 
-      // Check for an existing userHousehold membership doc
-      const hId = await getUserHouseholdId(user.uid);
+      // Check for an existing userHousehold membership doc.
+      // Wrap in try/catch: if Firestore rules haven't been updated yet,
+      // this read throws permission-denied — fall through to legacy check.
+      let hId: string | null = null;
+      try {
+        hId = await getUserHouseholdId(user.uid);
+      } catch {
+        // permission denied on userHouseholds — old rules still in effect
+      }
+
       if (hId) {
         // Load the household metadata (name + invite code)
         const hSnap = await getDoc(doc(db, "households", hId));
