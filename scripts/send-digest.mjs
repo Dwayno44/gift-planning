@@ -28,6 +28,10 @@ const APP_URL = "https://dwayno44.github.io/gift-planning/";
 // Firebase Admin init
 // ---------------------------------------------------------------------------
 
+if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+  console.error("FIREBASE_SERVICE_ACCOUNT secret is missing — add it under repo Settings → Secrets → Actions.");
+  process.exit(1);
+}
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 initializeApp({ credential: cert(serviceAccount), projectId: PROJECT_ID });
 const db = getFirestore();
@@ -301,11 +305,30 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-await transporter.sendMail({
-  from: `"Gift Planner" <${SENDER_EMAIL}>`,
-  to: RECIPIENTS.join(", "),
-  subject,
-  html,
-});
+if (!process.env.GMAIL_APP_PASSWORD) {
+  console.error("GMAIL_APP_PASSWORD secret is missing — add it under repo Settings → Secrets → Actions.");
+  process.exit(1);
+}
+
+try {
+  await transporter.sendMail({
+    from: `"Gift Planner" <${SENDER_EMAIL}>`,
+    to: RECIPIENTS.join(", "),
+    subject,
+    html,
+  });
+} catch (err) {
+  if (err.code === "EAUTH") {
+    // Google revokes app passwords whenever the account password changes.
+    console.error(
+      `Gmail rejected the login for ${SENDER_EMAIL} (${err.response ?? err.message}).\n` +
+        "Create a new App Password at https://myaccount.google.com/apppasswords and " +
+        "update the GMAIL_APP_PASSWORD repo secret."
+    );
+  } else {
+    console.error("Sending the digest email failed:", err);
+  }
+  process.exit(1);
+}
 
 console.log(`Digest sent to ${RECIPIENTS.join(", ")} — ${digest.urgent.length} urgent, ${digest.upcoming.length} upcoming, ${digest.sorted.length} sorted, ${digest.horizon.length} on horizon.`);
