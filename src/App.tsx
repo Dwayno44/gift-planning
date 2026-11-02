@@ -5,11 +5,13 @@ import WeeklyDigestPage from "./pages/WeeklyDigestPage";
 import SettingsPage from "./pages/SettingsPage";
 import ChristmasPage from "./pages/ChristmasPage";
 import EventsPage from "./pages/EventsPage";
+import ShoppingPage from "./pages/ShoppingPage";
 import Modal from "./components/Modal";
 import PersonDetail from "./components/PersonDetail";
 import PersonForm from "./components/PersonForm";
 
-type Page = "birthdays" | "digest" | "christmas" | "events" | "settings";
+// "shopping" is reached from the app bar, not the bottom nav.
+type Page = "birthdays" | "digest" | "christmas" | "events" | "settings" | "shopping";
 
 interface NavItem {
   page: Page;
@@ -75,6 +77,7 @@ const TITLES: Record<Page, string> = {
   christmas: "Christmas",
   events: "Events",
   settings: "Settings",
+  shopping: "Shopping list",
 };
 
 export default function App() {
@@ -106,6 +109,20 @@ export default function App() {
           </span>
           <h1 className="text-lg font-bold text-ink">Gift Planner</h1>
           <span className="ml-auto text-sm text-muted">{TITLES[page]}</span>
+          <button
+            onClick={() => setPage("shopping")}
+            aria-label="Shopping list"
+            aria-current={page === "shopping" ? "page" : undefined}
+            className={`ml-1 rounded-xl p-2 transition ${
+              page === "shopping" ? "bg-accent-soft text-accent" : "text-muted hover:text-ink"
+            }`}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="9" cy="20" r="1.5" />
+              <circle cx="18" cy="20" r="1.5" />
+              <path d="M2 3h3l2.7 12.4a1.5 1.5 0 0 0 1.5 1.1h8.6a1.5 1.5 0 0 0 1.5-1.1L21 7H6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
         </div>
       </header>
 
@@ -115,6 +132,7 @@ export default function App() {
         {page === "digest" && <WeeklyDigestPage onOpenPerson={openPerson} />}
         {page === "christmas" && <ChristmasPage />}
         {page === "events" && <EventsPage />}
+        {page === "shopping" && <ShoppingPage />}
         {page === "settings" && <SettingsPage onOpenPerson={openPerson} onAddPerson={openAdd} />}
       </main>
 
