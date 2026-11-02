@@ -97,4 +97,12 @@ export interface AppData {
    * intentionally deleted.
    */
   appliedSeedIds?: string[];
+  /** Subscribed calendar (webcal) link, shared by the household. */
+  calendarFeed?: CalendarFeed;
+}
+
+export interface CalendarFeed {
+  url: string;
+  /** Calendar event UIDs already added or skipped, so they aren't offered again. */
+  dismissed: string[];
 }

@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from "react";
 import { onAuthStateChanged, signOut as fbSignOut, type User } from "firebase/auth";
 import { doc, getDoc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
-import type { AppData, GiftIdea, Occasion, Person } from "../types";
+import type { AppData, CalendarFeed, GiftIdea, Occasion, Person } from "../types";
 import * as storage from "../data/storage";
 import { sampleData } from "../data/sampleData";
 import { makeId } from "../utils/id";
@@ -60,6 +60,10 @@ interface AppContextValue {
   addTheme: (theme: string) => void;
   removeTheme: (theme: string) => void;
 
+  calendarFeed: CalendarFeed | null;
+  setCalendarUrl: (url: string | null) => void;
+  dismissCalendarEvents: (uids: string[]) => void;
+
   exportData: () => string;
   importData: (json: string) => void;
   resetToSample: () => void;
@@ -71,7 +75,7 @@ const AppContext = createContext<AppContextValue | null>(null);
 const MODE: "local" | "cloud" = isFirebaseConfigured() ? "cloud" : "local";
 
 function fingerprint(d: AppData): string {
-  return JSON.stringify({ people: d.people, themes: d.themes, occasions: d.occasions ?? [], appliedSeedIds: d.appliedSeedIds ?? [] });
+  return JSON.stringify({ people: d.people, themes: d.themes, occasions: d.occasions ?? [], appliedSeedIds: d.appliedSeedIds ?? [], calendarFeed: d.calendarFeed ?? null });
 }
 
 function Splash() {
@@ -461,6 +465,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [update]
   );
 
+  const setCalendarUrl = useCallback<AppContextValue["setCalendarUrl"]>(
+    (url) =>
+      update((d) => {
+        // Cloud saves merge, so "removed" is stored as a blank url rather than a deleted field.
+        // A different calendar starts with a clean skip list.
+        const next = url ?? "";
+        const keep = next && d.calendarFeed?.url === next ? d.calendarFeed.dismissed : [];
+        return { ...d, calendarFeed: { url: next, dismissed: keep } };
+      }),
+    [update]
+  );
+
+  const dismissCalendarEvents = useCallback<AppContextValue["dismissCalendarEvents"]>(
+    (uids) =>
+      update((d) =>
+        d.calendarFeed
+          ? { ...d, calendarFeed: { ...d.calendarFeed, dismissed: Array.from(new Set([...d.calendarFeed.dismissed, ...uids])) } }
+          : d
+      ),
+    [update]
+  );
+
   const exportData = useCallback(() => storage.exportJSON(data), [data]);
   const replaceAll = useCallback<AppContextValue["replaceAll"]>((next) => setData(storage.normalizeData(next)), []);
   const importData = useCallback<AppContextValue["importData"]>((json) => setData(storage.importJSON(json)), []);
@@ -511,6 +537,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteOccasionGiftIdea,
       addTheme,
       removeTheme,
+      calendarFeed: data.calendarFeed?.url ? data.calendarFeed : null,
+      setCalendarUrl,
+      dismissCalendarEvents,
       exportData,
       importData,
       resetToSample,
@@ -543,6 +572,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteOccasionGiftIdea,
       addTheme,
       removeTheme,
+      setCalendarUrl,
+      dismissCalendarEvents,
       exportData,
       importData,
       resetToSample,

@@ -50,9 +50,9 @@ export function parseICS(text: string): ParsedCalEvent[] {
   for (const block of blocks) {
     const summary = getField(block, "SUMMARY");
     const dtstart = getField(block, "DTSTART");
-    const uid = getField(block, "UID") ?? Math.random().toString(36).slice(2);
-
     if (!summary || !dtstart) continue;
+    // Stable fallback so skipped events stay skipped on the next feed refresh
+    const uid = getField(block, "UID") ?? `${summary}|${dtstart}`;
     const date = parseDate(dtstart);
     if (!date) continue;
 

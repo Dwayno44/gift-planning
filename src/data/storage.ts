@@ -40,6 +40,13 @@ export function normalizeData(input: unknown): AppData {
     themes: Array.isArray(data.themes) ? data.themes : [],
     updatedAt: data.updatedAt ?? new Date().toISOString(),
     appliedSeedIds: Array.isArray(data.appliedSeedIds) ? data.appliedSeedIds : undefined,
+    calendarFeed:
+      data.calendarFeed && typeof data.calendarFeed.url === "string"
+        ? {
+            url: data.calendarFeed.url,
+            dismissed: Array.isArray(data.calendarFeed.dismissed) ? data.calendarFeed.dismissed : [],
+          }
+        : undefined,
   };
 }
 

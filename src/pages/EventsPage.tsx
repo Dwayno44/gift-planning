@@ -1,20 +1,65 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../context/AppContext";
 import OccasionCard from "../components/OccasionCard";
 import OccasionDetail from "../components/OccasionDetail";
 import OccasionForm from "../components/OccasionForm";
 import CalendarImportModal from "../components/CalendarImportModal";
+import CalendarLinkForm from "../components/CalendarLinkForm";
 import Modal from "../components/Modal";
 import { daysUntilOccasion } from "../utils/occasionUtils";
 import { parseICS, matchCalEvents } from "../utils/icsParser";
 import type { MatchedCalEvent } from "../utils/icsParser";
+import { calEventKey, fetchNewCalendarEvents, isCalendarSyncAvailable } from "../utils/calendarFeed";
 
 export default function EventsPage() {
-  const { occasions, addOccasion, updateOccasion } = useApp();
+  const { occasions, addOccasion, updateOccasion, calendarFeed, setCalendarUrl, dismissCalendarEvents } = useApp();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [formState, setFormState] = useState<{ mode: "add" } | { mode: "edit"; id: string } | null>(null);
   const [importMatches, setImportMatches] = useState<MatchedCalEvent[] | null>(null);
+  // Where the open import list came from — feed events left unticked are remembered as skipped
+  const [importSource, setImportSource] = useState<"file" | "feed">("file");
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [feedMatches, setFeedMatches] = useState<MatchedCalEvent[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const feedUrl = calendarFeed?.url ?? null;
+
+  const checkFeed = async (url: string): Promise<MatchedCalEvent[] | null> => {
+    if (!isCalendarSyncAvailable()) return null;
+    setChecking(true);
+    setLinkError(null);
+    try {
+      const fresh = await fetchNewCalendarEvents(url, occasions, calendarFeed?.url === url ? calendarFeed.dismissed : []);
+      setFeedMatches(fresh);
+      return fresh;
+    } catch (err) {
+      setLinkError(err instanceof Error ? err.message : "Couldn't reach the calendar.");
+      return null;
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  // Quietly check the subscribed calendar whenever the Events tab opens
+  useEffect(() => {
+    if (feedUrl) checkFeed(feedUrl);
+    else setFeedMatches([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedUrl]);
+
+  const handleSaveLink = async (url: string) => {
+    setCalendarUrl(url);
+    const fresh = await checkFeed(url);
+    if (fresh) {
+      setLinkOpen(false);
+      setImportSource("feed");
+      setImportMatches(fresh);
+    } else if (!isCalendarSyncAvailable()) {
+      setLinkOpen(false);
+    }
+  };
 
   const { upcoming, past } = useMemo(() => {
     const active = occasions.filter((o) => !o.archived);
@@ -43,6 +88,7 @@ export default function EventsPage() {
       const fresh = matches.filter(
         (m) => !existingKeys.has(`${m.event.summary.toLowerCase()}|${m.event.date}`)
       );
+      setImportSource("file");
       setImportMatches(fresh);
     } catch {
       alert("Couldn't read that file — make sure it's an .ics calendar export.");
@@ -52,6 +98,11 @@ export default function EventsPage() {
   const handleImportConfirm = (selected: MatchedCalEvent[]) => {
     for (const { event, suggestedType } of selected) {
       addOccasion({ title: event.summary, type: suggestedType, date: event.date });
+    }
+    if (importSource === "feed" && importMatches) {
+      // Added and unticked alike — don't offer these again
+      dismissCalendarEvents(importMatches.map(calEventKey));
+      setFeedMatches([]);
     }
     setImportMatches(null);
   };
@@ -64,6 +115,16 @@ export default function EventsPage() {
           <p className="text-sm text-muted">Weddings, baby showers, and more</p>
         </div>
         <div className="flex gap-2 shrink-0">
+          <button
+            className="btn-soft px-3 py-2 text-sm"
+            onClick={() => {
+              setLinkError(null);
+              setLinkOpen(true);
+            }}
+            title="Subscribe to a shared calendar link"
+          >
+            🔗{feedUrl ? " Linked" : " Link"}
+          </button>
           <button
             className="btn-soft px-3 py-2 text-sm"
             onClick={() => fileRef.current?.click()}
@@ -83,6 +144,25 @@ export default function EventsPage() {
           onChange={handleICSFile}
         />
       </header>
+
+      {feedMatches.length > 0 && importMatches === null && (
+        <button
+          className="card flex w-full items-center gap-3 p-4 text-left"
+          onClick={() => {
+            setImportSource("feed");
+            setImportMatches(feedMatches);
+          }}
+        >
+          <span className="text-2xl">📅</span>
+          <span className="flex-1">
+            <span className="block font-semibold text-ink">
+              {feedMatches.length} new event{feedMatches.length !== 1 ? "s" : ""} on your calendar
+            </span>
+            <span className="block text-sm text-muted">Tap to review and add</span>
+          </span>
+          <span className="text-accent-ink">→</span>
+        </button>
+      )}
 
       {occasions.filter((o) => !o.archived).length === 0 ? (
         <div className="card p-6 text-center">
@@ -141,6 +221,23 @@ export default function EventsPage() {
             matches={importMatches}
             onImport={handleImportConfirm}
             onCancel={() => setImportMatches(null)}
+          />
+        )}
+      </Modal>
+
+      {/* Calendar link modal */}
+      <Modal open={linkOpen} title="Calendar link" onClose={() => setLinkOpen(false)}>
+        {linkOpen && (
+          <CalendarLinkForm
+            currentUrl={feedUrl}
+            checking={checking}
+            error={linkError}
+            onSave={handleSaveLink}
+            onRemove={() => {
+              setCalendarUrl(null);
+              setLinkOpen(false);
+            }}
+            onCancel={() => setLinkOpen(false)}
           />
         )}
       </Modal>
