@@ -3,6 +3,7 @@ import type { StatusMeta } from "./statusUtils";
 
 export const OCCASION_META: Record<OccasionType, { label: string; emoji: string }> = {
   baby_shower:  { label: "Baby shower",  emoji: "🍼" },
+  kids_party:   { label: "Kids' party",  emoji: "🎈" },
   wedding:      { label: "Wedding",      emoji: "💍" },
   anniversary:  { label: "Anniversary",  emoji: "💝" },
   housewarming: { label: "Housewarming", emoji: "🏠" },

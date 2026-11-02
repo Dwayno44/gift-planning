@@ -62,6 +62,7 @@ export interface Person {
 
 export type OccasionType =
   | "baby_shower"
+  | "kids_party"
   | "wedding"
   | "anniversary"
   | "housewarming"

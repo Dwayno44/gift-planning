@@ -79,6 +79,8 @@ const RULES: Rule[] = [
   { keywords: ["housewarming", "house warming", "new home"], type: "housewarming" },
   { keywords: ["graduation", "grad night", "prom"], type: "graduation" },
   { keywords: ["engagement", "engaged", "got engaged"], type: "engagement" },
+  // Before the christening rule, whose "birth" keyword would otherwise swallow "birthday".
+  { keywords: ["party", "bday", "b'day", "birthday"], type: "kids_party" },
   { keywords: ["christening", "baptism", "naming day", "naming ceremony", "baby shower", "birth"], type: "baby_shower" },
 ];
 
