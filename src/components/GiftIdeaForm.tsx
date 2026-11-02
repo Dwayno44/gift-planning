@@ -40,7 +40,7 @@ export default function GiftIdeaForm({ initial, onSubmit, onCancel }: Props) {
   const [priority, setPriority] = useState<Priority>(initial?.priority ?? "medium");
   const [status, setStatus] = useState<GiftIdeaStatus>(initial?.status ?? "idea");
   const [showMore, setShowMore] = useState(
-    !!(initial?.notes || initial?.purchaseUrl || initial?.store || initial?.estimatedPrice)
+    !!(initial?.notes || initial?.store)
   );
 
   const submit = (e: React.FormEvent) => {
@@ -78,19 +78,32 @@ export default function GiftIdeaForm({ initial, onSubmit, onCancel }: Props) {
         </p>
       </div>
 
-      <div>
-        <label className="label" htmlFor="idea-url">
-          Paste a link (optional)
-        </label>
-        <input
-          id="idea-url"
-          className="input"
-          type="url"
-          inputMode="url"
-          value={purchaseUrl}
-          placeholder="https://…"
-          onChange={(e) => setPurchaseUrl(e.target.value)}
-        />
+      <div className="grid grid-cols-[1fr_6.5rem] gap-3">
+        <div>
+          <label className="label" htmlFor="idea-url">
+            Paste a link (optional)
+          </label>
+          <input
+            id="idea-url"
+            className="input"
+            type="url"
+            inputMode="url"
+            value={purchaseUrl}
+            placeholder="https://…"
+            onChange={(e) => setPurchaseUrl(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="label" htmlFor="idea-price">Approx. $</label>
+          <input
+            id="idea-price"
+            className="input"
+            inputMode="decimal"
+            value={estimatedPrice}
+            placeholder="0"
+            onChange={(e) => setEstimatedPrice(e.target.value)}
+          />
+        </div>
       </div>
 
       {!showMore && (
@@ -111,28 +124,15 @@ export default function GiftIdeaForm({ initial, onSubmit, onCancel }: Props) {
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label" htmlFor="idea-price">Approx. price</label>
-              <input
-                id="idea-price"
-                className="input"
-                inputMode="decimal"
-                value={estimatedPrice}
-                placeholder="0"
-                onChange={(e) => setEstimatedPrice(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="label" htmlFor="idea-store">Store / vendor</label>
-              <input
-                id="idea-store"
-                className="input"
-                value={store}
-                placeholder="e.g. Etsy"
-                onChange={(e) => setStore(e.target.value)}
-              />
-            </div>
+          <div>
+            <label className="label" htmlFor="idea-store">Store / vendor</label>
+            <input
+              id="idea-store"
+              className="input"
+              value={store}
+              placeholder="e.g. Big W"
+              onChange={(e) => setStore(e.target.value)}
+            />
           </div>
 
           <div>

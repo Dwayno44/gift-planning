@@ -121,6 +121,35 @@ export function buildShoppingList(
   return { groups, gaps };
 }
 
+export interface CostSummary {
+  total: number;
+  priced: number;
+  unpriced: number;
+}
+
+/** Sum of approx. prices, plus how many items have no price yet. */
+export function costSummary(items: ShoppingItem[]): CostSummary {
+  let total = 0;
+  let priced = 0;
+  for (const { idea } of items) {
+    if (idea.estimatedPrice != null) {
+      total += idea.estimatedPrice;
+      priced++;
+    }
+  }
+  return { total, priced, unpriced: items.length - priced };
+}
+
+export function formatMoney(n: number): string {
+  return `$${Math.round(n).toLocaleString("en-AU")}`;
+}
+
+/** "~$340 · 2 unpriced", "~$340", "no prices yet" — "" when there's nothing to say. */
+export function costLabel({ total, priced, unpriced }: CostSummary): string {
+  if (priced === 0) return unpriced > 0 ? "no prices yet" : "";
+  return unpriced > 0 ? `~${formatMoney(total)} · ${unpriced} unpriced` : `~${formatMoney(total)}`;
+}
+
 export function formatShortDate(d: Date): string {
   return d.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
 }
@@ -128,8 +157,11 @@ export function formatShortDate(d: Date): string {
 /** Plain-text version for pasting into Messages / Notes / an email. */
 export function shoppingListText(groups: ShoppingGroup[], heading: string): string {
   const lines = [`🛒 ${heading}`];
+  const overall = costLabel(costSummary(groups.flatMap((g) => g.items)));
+  if (overall) lines.push(`Total: ${overall}`);
   for (const g of groups) {
-    lines.push("", `${g.emoji} ${g.title} — ${formatShortDate(g.date)}`);
+    const cost = costLabel(costSummary(g.items));
+    lines.push("", `${g.emoji} ${g.title} — ${formatShortDate(g.date)}${cost ? ` (${cost})` : ""}`);
     for (const { idea, forName } of g.items) {
       const extras = [
         idea.estimatedPrice != null ? `~$${idea.estimatedPrice}` : "",

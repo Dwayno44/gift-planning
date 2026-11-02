@@ -4,6 +4,8 @@ import type { GiftIdea } from "../types";
 import { daysUntilChristmas } from "../utils/christmasUtils";
 import {
   buildShoppingList,
+  costLabel,
+  costSummary,
   formatShortDate,
   shoppingListText,
   type ShoppingItem,
@@ -66,6 +68,7 @@ export default function ShoppingPage() {
     .map((g) => ({ ...g, items: g.items.filter((it) => !bought[it.idea.id]) }))
     .filter((g) => g.items.length > 0);
   const remainingCount = remaining.reduce((n, g) => n + g.items.length, 0);
+  const remainingCost = costLabel(costSummary(remaining.flatMap((g) => g.items)));
   const banner = saleBanner();
 
   const setStatus = ({ idea, source }: ShoppingItem, status: GiftIdea["status"]) => {
@@ -143,6 +146,7 @@ export default function ShoppingPage() {
       <div className="flex items-center gap-2">
         <p className="text-sm text-muted">
           <span className="font-semibold text-ink">{remainingCount}</span> to buy
+          {remainingCost && <span className="block text-xs">{remainingCost}</span>}
         </p>
         <div className="ml-auto flex gap-2">
           {"share" in navigator && (
@@ -167,11 +171,14 @@ export default function ShoppingPage() {
           <p className="mt-1 text-sm text-muted">No open gift ideas in this window. Try a longer one.</p>
         </div>
       ) : (
-        list.groups.map((g) => (
+        list.groups.map((g) => {
+          const groupCost = costLabel(costSummary(g.items.filter((it) => !bought[it.idea.id])));
+          return (
           <section key={g.key} className="card p-4">
             <div className="flex items-baseline justify-between gap-2">
               <h2 className="font-semibold text-ink">
                 {g.emoji} {g.title}
+                {groupCost && <span className="ml-2 text-xs font-normal text-muted">{groupCost}</span>}
               </h2>
               <span className="shrink-0 text-xs text-muted">
                 {formatShortDate(g.date)} · {g.days === 0 ? "today" : `${g.days}d`}
@@ -220,7 +227,8 @@ export default function ShoppingPage() {
               })}
             </ul>
           </section>
-        ))
+          );
+        })
       )}
 
       {hasGaps && (
